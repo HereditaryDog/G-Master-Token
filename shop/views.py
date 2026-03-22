@@ -20,7 +20,13 @@ from .models import (
     SiteAnnouncement,
 )
 from .services.order_flow import create_single_item_order, mark_order_paid
-from .services.payment import create_checkout_session, verify_stripe_checkout
+from .services.payment import (
+    create_checkout_session,
+    get_default_gateway_code,
+    list_active_payment_gateways,
+    list_reserved_payment_gateways,
+    verify_payment_callback,
+)
 
 
 class MerchantRequiredMixin(UserPassesTestMixin):
@@ -104,6 +110,13 @@ class CheckoutView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related("items__deliveries")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["payment_gateways"] = list_active_payment_gateways()
+        context["reserved_payment_gateways"] = list_reserved_payment_gateways()
+        context["default_payment_gateway"] = get_default_gateway_code()
+        return context
+
 
 class StartPaymentView(LoginRequiredMixin, View):
     def post(self, request, order_no):
@@ -112,7 +125,13 @@ class StartPaymentView(LoginRequiredMixin, View):
             messages.info(request, "该订单已经支付完成。")
             return redirect("shop:order_detail", order_no=order.order_no)
 
-        session = create_checkout_session(order, request)
+        provider_code = request.POST.get("provider", "").strip()
+        try:
+            session = create_checkout_session(order, request, provider_code=provider_code)
+        except ValueError:
+            messages.error(request, "当前选择的支付通道尚未启用，请更换其它支付方式。")
+            return redirect("shop:checkout", order_no=order.order_no)
+
         order.payment_provider = session.provider
         order.payment_reference = session.reference
         order.checkout_url = session.redirect_url
@@ -169,9 +188,9 @@ class PaymentSuccessView(LoginRequiredMixin, TemplateView):
         order = get_object_or_404(Order, order_no=kwargs["order_no"], user=self.request.user)
         session_id = self.request.GET.get("session_id", "")
         if order.payment_status != Order.PaymentStatus.PAID and session_id:
-            checkout_data = verify_stripe_checkout(session_id)
+            checkout_data = verify_payment_callback(order.payment_provider, session_id=session_id)
             if checkout_data and checkout_data.get("payment_status") == "paid":
-                mark_order_paid(order, provider="stripe", reference=session_id, payload=checkout_data)
+                mark_order_paid(order, provider=order.payment_provider, reference=session_id, payload=checkout_data)
         context["order"] = order
         context["result_title"] = "支付结果"
         context["result_message"] = "如果订单已经付款，系统会在几秒内完成自动发货。"
@@ -412,7 +431,12 @@ class StripeWebhookView(View):
     def post(self, request, *args, **kwargs):
         payload = request.body
         signature = request.headers.get("Stripe-Signature", "")
-        checkout_data = verify_stripe_checkout(signature_payload=payload, signature=signature, from_webhook=True)
+        checkout_data = verify_payment_callback(
+            "stripe",
+            signature_payload=payload,
+            signature=signature,
+            from_webhook=True,
+        )
         if not checkout_data:
             return HttpResponseBadRequest("invalid payload")
 

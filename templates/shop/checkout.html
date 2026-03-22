@@ -31,17 +31,45 @@
         <div class="content-card soft">
             <h3>支付方式</h3>
             <p class="muted">
-                当前如果未配置 Stripe，会自动走本地模拟支付流程。
-                等你填入正式密钥后，这里会直接跳转到 Stripe Checkout。
+                当前支付层已经升级成多通道网关架构。
+                现在默认可用的是已配置通道，支付宝、微信、USDT、银行卡这些接口也已经预留好。
             </p>
             {% if order.payment_status == "paid" %}
                 <a class="primary-button full-width" href="{% url 'shop:order_detail' order.order_no %}">查看订单结果</a>
             {% else %}
                 <form method="post" action="{% url 'shop:start_payment' order.order_no %}">
                     {% csrf_token %}
+                    <div class="payment-option-list">
+                        {% for gateway in payment_gateways %}
+                            <label class="payment-option">
+                                <input
+                                    type="radio"
+                                    name="provider"
+                                    value="{{ gateway.code }}"
+                                    {% if gateway.code == default_payment_gateway %}checked{% endif %}
+                                >
+                                <div class="payment-option__body">
+                                    <strong>{{ gateway.label }}</strong>
+                                    <span>{{ gateway.summary }}</span>
+                                </div>
+                                <span class="pill">{{ gateway.channel_type }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
                     <button type="submit" class="primary-button full-width">创建支付并继续</button>
                 </form>
             {% endif %}
+            <div class="payment-reserved">
+                <strong>已预留支付接口</strong>
+                <div class="payment-reserved__list">
+                    {% for gateway in reserved_payment_gateways %}
+                        <div class="payment-reserved__item">
+                            <span>{{ gateway.label }}</span>
+                            <small>{{ gateway.summary }}</small>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
 </section>

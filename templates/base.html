@@ -5,9 +5,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/site.css' %}">
 </head>
 <body>
@@ -18,7 +15,7 @@
                     <span class="brand-dot"></span>
                     <span>{{ site_name }}</span>
                 </a>
-                <p class="brand-subtitle">自动发卡 / Token 充值 / 帮助中心 / 商家管理</p>
+                <p class="brand-subtitle">为开发者提供 Token 充值、自动发卡与订单查询服务</p>
             </div>
             <nav class="site-nav">
                 <a href="{% url 'shop:storefront' %}">首页</a>
@@ -35,7 +32,7 @@
                         <button type="submit" class="ghost-button">退出</button>
                     </form>
                 {% else %}
-                    <a href="{% url 'login' %}">登录</a>
+                    <a href="{% url 'accounts:login' %}">登录</a>
                     <a class="cta-link" href="{% url 'accounts:signup' %}">注册</a>
                 {% endif %}
             </nav>

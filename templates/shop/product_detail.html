@@ -34,7 +34,7 @@
         {% else %}
             <div class="notice-card">
                 <p>下单前需要先登录账号。</p>
-                <a class="primary-button" href="{% url 'login' %}?next={{ request.path }}">先登录再购买</a>
+                <a class="primary-button" href="{% url 'accounts:login' %}?next={{ request.path }}">先登录再购买</a>
             </div>
         {% endif %}
     </div>

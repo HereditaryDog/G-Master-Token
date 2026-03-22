@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from shop.models import CardCode, DeliveryRecord, HelpArticle, Order, Product, ProductCategory, SiteAnnouncement
+from shop.services.payment import get_default_gateway_code, list_active_payment_gateways, list_reserved_payment_gateways
 
 
 class StoreOrderFlowTests(TestCase):
@@ -86,6 +87,29 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(list_response, "测试教程")
         self.assertContains(detail_response, "教程正文")
+
+    def test_checkout_page_shows_active_and_reserved_payment_gateways(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        client.post(reverse("shop:create_order", args=[self.product.slug]), {"quantity": 1})
+        order = Order.objects.get(user=self.buyer)
+
+        response = client.get(reverse("shop:checkout", args=[order.order_no]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "模拟支付")
+        self.assertContains(response, "支付宝")
+        self.assertContains(response, "微信支付")
+        self.assertContains(response, "USDT")
+        self.assertContains(response, "银行卡转账")
+
+    def test_payment_gateway_registry_exposes_future_channels(self):
+        active_codes = [gateway.code for gateway in list_active_payment_gateways()]
+        reserved_codes = [gateway.code for gateway in list_reserved_payment_gateways()]
+        self.assertIn(get_default_gateway_code(), active_codes)
+        self.assertIn("alipay", reserved_codes)
+        self.assertIn("wechat_pay", reserved_codes)
+        self.assertIn("usdt", reserved_codes)
+        self.assertIn("bank_transfer", reserved_codes)
 
 
 class MerchantDashboardTests(TestCase):

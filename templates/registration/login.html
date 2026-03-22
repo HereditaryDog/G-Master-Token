@@ -7,14 +7,22 @@
     <div class="auth-card">
         <p class="eyebrow">Welcome back</p>
         <h1>登录商城账号</h1>
-        <p class="muted">登录后继续支付、查看卡密和访问订单详情。</p>
+        <p class="muted">使用用户名或邮箱地址登录，并输入验证码完成人机验证。</p>
         <form method="post" class="form-grid">
             {% csrf_token %}
             {{ form.non_field_errors }}
             {% for field in form %}
                 <label class="field">
                     <span>{{ field.label }}</span>
-                    {{ field }}
+                    {% if field.name == "captcha" %}
+                        <div class="inline-field">
+                            {{ field }}
+                            <span class="captcha-box">{{ captcha_value }}</span>
+                        </div>
+                        <small class="muted">看不清验证码时，刷新当前页面即可更换。</small>
+                    {% else %}
+                        {{ field }}
+                    {% endif %}
                     {% if field.errors %}
                         <small class="error-text">{{ field.errors|join:", " }}</small>
                     {% endif %}

@@ -5,3 +5,5 @@ db.sqlite3
 media/
 staticfiles/
 .env
+runserver.log
+runserver.err.log

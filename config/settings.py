@@ -26,6 +26,24 @@ PROJECT_VERSION = os.getenv("PROJECT_VERSION", VERSION)
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+PAYMENT_ENABLE_MOCK_GATEWAY = os.getenv("PAYMENT_ENABLE_MOCK_GATEWAY", "true").lower() == "true"
+PAYMENT_ENABLE_STRIPE_GATEWAY = os.getenv("PAYMENT_ENABLE_STRIPE_GATEWAY", "true").lower() == "true"
+PAYMENT_ENABLE_ALIPAY_GATEWAY = os.getenv("PAYMENT_ENABLE_ALIPAY_GATEWAY", "false").lower() == "true"
+PAYMENT_ENABLE_WECHAT_GATEWAY = os.getenv("PAYMENT_ENABLE_WECHAT_GATEWAY", "false").lower() == "true"
+PAYMENT_ENABLE_USDT_GATEWAY = os.getenv("PAYMENT_ENABLE_USDT_GATEWAY", "false").lower() == "true"
+PAYMENT_ENABLE_BANK_GATEWAY = os.getenv("PAYMENT_ENABLE_BANK_GATEWAY", "false").lower() == "true"
+ALIPAY_APP_ID = os.getenv("ALIPAY_APP_ID", "")
+ALIPAY_GATEWAY_URL = os.getenv("ALIPAY_GATEWAY_URL", "")
+WECHAT_APP_ID = os.getenv("WECHAT_APP_ID", "")
+WECHAT_MCH_ID = os.getenv("WECHAT_MCH_ID", "")
+WECHAT_API_V3_KEY = os.getenv("WECHAT_API_V3_KEY", "")
+WECHAT_CERT_SERIAL_NO = os.getenv("WECHAT_CERT_SERIAL_NO", "")
+USDT_NETWORK = os.getenv("USDT_NETWORK", "TRC20")
+USDT_RECEIVE_ADDRESS = os.getenv("USDT_RECEIVE_ADDRESS", "")
+BANK_ACCOUNT_NAME = os.getenv("BANK_ACCOUNT_NAME", "")
+BANK_NAME = os.getenv("BANK_NAME", "")
+BANK_ACCOUNT_NUMBER = os.getenv("BANK_ACCOUNT_NUMBER", "")
+BANK_SWIFT_CODE = os.getenv("BANK_SWIFT_CODE", "")
 PARTNER_API_BASE_URL = os.getenv("PARTNER_API_BASE_URL", "")
 PARTNER_API_KEY = os.getenv("PARTNER_API_KEY", "")
 PARTNER_TIMEOUT = int(os.getenv("PARTNER_TIMEOUT", "20"))
@@ -102,6 +120,9 @@ else:
     }
 
 AUTH_USER_MODEL = 'accounts.User'
+AUTHENTICATION_BACKENDS = [
+    'accounts.auth_backends.UsernameOrEmailBackend',
+]
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -135,8 +156,18 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 LOGIN_REDIRECT_URL = 'shop:storefront'
 LOGOUT_REDIRECT_URL = 'shop:storefront'
-LOGIN_URL = 'login'
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+LOGIN_URL = 'accounts:login'
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", 'django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@web001.local")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "20"))
+EMAIL_CODE_EXPIRY_MINUTES = int(os.getenv("EMAIL_CODE_EXPIRY_MINUTES", "10"))
+EMAIL_CODE_COOLDOWN_SECONDS = int(os.getenv("EMAIL_CODE_COOLDOWN_SECONDS", "60"))
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
