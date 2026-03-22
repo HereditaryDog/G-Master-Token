@@ -1,24 +1,38 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+本文件记录项目的可见版本变更。
 
 ## 0.0.2 - 2026-03-23
 
-- Refined the storefront visual direction toward a cleaner Apple-inspired landing page.
-- Added multi-gateway payment architecture with reserved interfaces for Alipay, WeChat Pay, USDT, and bank transfer.
-- Reworked account registration to require username, email, phone number, password, and email verification code.
-- Reworked login to support username or email plus password and human-verification captcha.
-- Added email verification code model, sending utilities, custom auth backend, and admin visibility for verification records.
-- Switched local email delivery from console output to Gmail SMTP for real verification email delivery.
-- Expanded automated tests for registration, login, captcha, payment gateway exposure, and help center behavior.
+### Added
+
+- 邮箱验证码注册流程
+- 用户名或邮箱登录支持
+- 登录页人机验证码
+- Gmail SMTP 发信支持
+- 多支付网关抽象
+- 支付宝、微信支付、USDT、银行卡转账的预留支付接口
+
+### Changed
+
+- 首页视觉重构，整体风格更接近苹果官网方向
+- 认证链路升级为更完整的注册 / 登录 / 邮箱验证方案
+- 结算页升级为多支付通道展示结构
+- README 重写为正式项目首页风格
+
+### Verified
+
+- `manage.py check`
+- `manage.py test accounts shop`
 
 ## 0.0.1 - 2026-03-23
 
-- Initialized the `web_0.0.1` Django storefront workspace.
-- Added buyer registration, login, product catalog, checkout flow, and order pages.
-- Added merchant dashboard pages for product, inventory, and order management.
-- Added card-code inventory, payment attempts, delivery records, and partner API abstraction.
-- Added public order lookup, announcements, help center, and help article pages.
-- Added a multi-gateway payment abstraction with reserved interfaces for Alipay, WeChat Pay, USDT, and bank transfer.
-- Added SQLite/PostgreSQL environment-based configuration and Windows startup scripts.
-- Added demo seed data, automated tests, and initial GitHub repository publishing support.
+### Added
+
+- Django 商城项目初始化
+- 商品、订单、库存卡密、支付记录、发货记录模型
+- 前台首页、商品详情、订单页、帮助中心、公告、订单查询
+- 商家后台与 Django Admin 管理能力
+- SQLite / PostgreSQL 配置支持
+- Windows 启动脚本
+- 初始自动化测试

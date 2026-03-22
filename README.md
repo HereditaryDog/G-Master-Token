@@ -1,36 +1,77 @@
 # web_0.0.1
 
-一个面向点卡和 Token 充值场景的 Django 商城工作区，已包含：
+当前版本：`0.0.2`
 
-- 前台首页、商品详情、下单、支付页、订单详情
-- 用户注册登录
-- 商品、库存卡密、订单、支付记录、发货记录数据库模型
-- 自定义商家后台总览、商品管理、库存卡密管理、订单管理
-- Django Admin 管理后台
-- Stripe 支付预留接入
-- 支付宝、微信、USDT、银行卡支付接口预留
-- 合作 API 自动供货抽象层
-- SQLite / PostgreSQL 双数据库配置
-- Windows 生产启动脚本
-- 自动化测试
+一个面向数字点卡与 Token 充值场景的 Django 商城项目，包含前台商城、订单系统、用户认证、商家后台、帮助中心、支付抽象层和供货接口抽象层。
 
-## 当前认证方式
+## 亮点
+
+- 苹果官网风格方向的首页布局，适合继续做品牌化前台展示
+- 用户注册支持邮箱验证码，登录支持用户名或邮箱 + 密码 + 人机验证码
+- 支付层已抽象成多网关结构，预留 `Stripe`、`支付宝`、`微信支付`、`USDT`、`银行卡转账`
+- 订单、库存卡密、支付记录、发货记录、帮助文章、公告都已建模
+- 商家后台已具备商品管理、库存导入、订单查看能力
+- 帮助中心、公告详情、游客订单查询都已接入前台
+- 数据库支持 `SQLite` 和 `PostgreSQL` 切换
+- 已包含自动化测试，便于继续开发和迭代
+
+## 当前能力
+
+### 前台
+
+- 首页商品展示
+- 商品详情页
+- 订单结算页
+- 订单查询页
+- 帮助中心
+- 公告详情页
+
+### 用户系统
 
 - 注册：用户名、邮箱地址、手机号、邮箱验证码、密码
-- 登录：账号（用户名或邮箱地址）、密码、人机验证码
+- 登录：账号（用户名或邮箱）、密码、人机验证码
+- 邮箱验证状态记录
 
-如果要启用真实邮箱验证码，请把 `.env` 里的邮件配置改成可用的 SMTP 服务。
+### 商家后台
 
-## 启动方式
+- 商品管理
+- 库存卡密导入
+- 订单管理
+- Django Admin 后台
+
+### 支付与供货
+
+- 默认可用：模拟支付
+- 已接入：Stripe 结构
+- 已预留：支付宝、微信支付、USDT、银行卡转账
+- 供货方式：库存卡密 / 合作 API
+
+## 技术栈
+
+- Python 3.11
+- Django 5
+- SQLite / PostgreSQL
+- Waitress
+- Stripe SDK
+
+## 目录结构
+
+```text
+accounts/     用户、认证、邮箱验证码、登录逻辑
+config/       项目配置、版本号、全局设置
+shop/         商城模型、订单流、支付服务、供货服务
+templates/    前台页面和后台页面模板
+static/       样式资源
+```
+
+## 本地启动
 
 ```powershell
 cd C:\Users\Administrator\Desktop\web_test
 .venv\Scripts\activate
 copy .env.example .env
-python manage.py makemigrations
 python manage.py migrate
 python manage.py seed_demo_store
-python manage.py createsuperuser
 python manage.py runserver
 ```
 
@@ -40,27 +81,47 @@ python manage.py runserver
 .\Start-WebStore.ps1
 ```
 
-## 默认业务流
+本地访问：
 
-1. 用户注册或登录
-2. 进入商品详情页并下单
-3. 如果没配置 Stripe，则进入本地模拟支付
-4. 支付成功后系统自动发货
-5. 用户在订单详情中查看卡密或 Token 兑换码
-6. 商家通过 `/dashboard/` 或 `/admin/` 管理商品、库存和订单
+- 首页：`http://127.0.0.1:8000/`
+- 注册：`http://127.0.0.1:8000/accounts/signup/`
+- 登录：`http://127.0.0.1:8000/accounts/login/`
+- 商家后台：`http://127.0.0.1:8000/dashboard/`
 
-## 已准备好的本地账号
+## 环境变量
 
-- 商家管理员：`owner`
-- 密码：`ChangeMe123!`
+核心配置在 `.env` 中完成。
 
-你也可以继续在前台注册普通买家账号做下单测试。
+### 基础
 
-## 数据库切换
+```env
+DJANGO_SECRET_KEY=replace-me
+DJANGO_DEBUG=true
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
+SITE_NAME=web_0.0.1
+```
 
-默认使用 SQLite，本地直接可跑。
+### 邮件
 
-如果要切到 PostgreSQL，只需要在 `.env` 中修改：
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+DEFAULT_FROM_EMAIL=your@gmail.com
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+EMAIL_USE_TLS=true
+EMAIL_USE_SSL=false
+EMAIL_TIMEOUT=20
+EMAIL_CODE_EXPIRY_MINUTES=10
+EMAIL_CODE_COOLDOWN_SECONDS=60
+```
+
+### 数据库
+
+SQLite 默认可直接使用。
+
+如果切换到 PostgreSQL：
 
 ```env
 DATABASE_ENGINE=postgres
@@ -69,29 +130,49 @@ DATABASE_USER=postgres
 DATABASE_PASSWORD=your-password
 DATABASE_HOST=127.0.0.1
 DATABASE_PORT=5432
+DATABASE_CONN_MAX_AGE=60
 ```
 
-然后执行：
+### 支付通道开关
 
-```powershell
-python manage.py migrate
+```env
+PAYMENT_ENABLE_MOCK_GATEWAY=true
+PAYMENT_ENABLE_STRIPE_GATEWAY=true
+PAYMENT_ENABLE_ALIPAY_GATEWAY=false
+PAYMENT_ENABLE_WECHAT_GATEWAY=false
+PAYMENT_ENABLE_USDT_GATEWAY=false
+PAYMENT_ENABLE_BANK_GATEWAY=false
 ```
 
-## 生产启动
+## 部署方式
 
-开发环境：
+### 开发环境
 
 ```powershell
 .\Start-WebStore.ps1
 ```
 
-生产环境（Windows + Waitress）：
+### Windows 生产环境
 
 ```powershell
 .\Start-WebStore-Prod.ps1
 ```
 
-如果你要走 HTTPS 反向代理，请把这些环境变量改成 `true`：
+生产脚本会自动执行：
+
+- `collectstatic`
+- `migrate`
+- `waitress-serve`
+
+### 推荐生产部署方案
+
+1. 使用 `PostgreSQL` 替换 SQLite
+2. 使用反向代理提供 HTTPS
+3. 开启安全相关环境变量
+4. 配置真实 SMTP 发信
+5. 补真实支付网关和合作 API 接口
+
+建议开启的安全环境变量：
 
 ```env
 DJANGO_SECURE_SSL_REDIRECT=true
@@ -102,20 +183,28 @@ DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=true
 DJANGO_SECURE_HSTS_PRELOAD=true
 ```
 
-## 真实对接时建议
+## 更新日志
 
-- 把 SQLite 切换到 PostgreSQL
-- 在 `shop/services/payment.py` 中补充正式支付渠道
-- 在 `shop/services/supplier.py` 中替换成真实合作平台接口
-- 对卡密做加密存储和审计日志
+完整记录见 [CHANGELOG.md](C:\Users\Administrator\Desktop\web_test\CHANGELOG.md)
 
-## 已预留的支付通道接口
+### 0.0.2
 
-- `Stripe`
-- `支付宝`
-- `微信支付`
-- `USDT`
-- `银行卡转账`
+- 重做首页视觉，风格更接近苹果官网方向
+- 新增多支付网关抽象，预留支付宝、微信、USDT、银行卡
+- 注册改成邮箱验证码流程
+- 登录支持用户名或邮箱 + 密码 + 人机验证码
+- 接入 Gmail SMTP 发信
 
-当前默认只启用已配置的支付网关。
-其中支付宝、微信、USDT、银行卡的配置位和服务抽象已经保留，后续只需要补各自网关实现与回调逻辑，不需要重写订单和支付记录结构。
+### 0.0.1
+
+- 初始化商城工作区
+- 完成商品、订单、库存卡密、支付记录、发货记录模型
+- 完成前台商城、商家后台、帮助中心、公告和订单查询
+- 完成基础测试和 GitHub 首次发布
+
+## 后续建议
+
+- 接真实支付渠道
+- 接真实合作 API 发货
+- 加客服页面、售后规则、推广分站模块
+- 加发布流水线和 GitHub Release 流程
