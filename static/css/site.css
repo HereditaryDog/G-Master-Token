@@ -532,6 +532,15 @@ select {
     text-transform: uppercase;
 }
 
+.captcha-box--button {
+    cursor: pointer;
+}
+
+.captcha-box--button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 .payment-ticket,
 .notice-card,
 .delivery-block,
@@ -736,6 +745,13 @@ select {
     align-items: start;
 }
 
+.support-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin: 22px 0;
+}
+
 .merchant-sidebar {
     position: sticky;
     top: 24px;
@@ -788,6 +804,7 @@ th {
     .apple-feature-grid,
     .help-layout,
     .help-detail-layout,
+    .support-grid,
     .detail-layout,
     .checkout-layout,
     .dashboard-grid,

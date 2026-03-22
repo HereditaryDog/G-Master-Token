@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}客服支持 | {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="content-card narrow">
+    <p class="eyebrow">Support</p>
+    <h1>客服与售后支持</h1>
+    <p class="lead">这里集中放联系渠道、售后处理方式和提交问题时需要准备的信息。</p>
+
+    <section class="support-grid">
+        <article class="content-card soft">
+            <h3>联系前准备</h3>
+            <div class="quick-link-list">
+                <span>订单号</span>
+                <span>下单邮箱</span>
+                <span>支付截图</span>
+                <span>异常说明</span>
+            </div>
+        </article>
+
+        <article class="content-card soft">
+            <h3>建议联系路径</h3>
+            <div class="promise-list">
+                <div class="promise-item">
+                    <strong>订单问题</strong>
+                    <span>优先使用订单查询页确认支付和发货状态，再联系人工处理。</span>
+                </div>
+                <div class="promise-item">
+                    <strong>充值未到账</strong>
+                    <span>提供订单号、付款记录和时间范围，便于快速核查。</span>
+                </div>
+                <div class="promise-item">
+                    <strong>支付相关</strong>
+                    <span>后续接入支付宝、微信、USDT、银行卡后，这里可继续扩展专属指引。</span>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="content-card soft">
+        <h3>售后说明</h3>
+        <div class="article-content">
+            <p>如果出现未到账、卡密异常或订单状态异常，请先保留订单号、付款记录和问题截图。</p>
+            <p>客服处理通常会先核验订单状态、支付记录和发货日志，再决定补发、重发或人工处理方案。</p>
+            <p>如果站点后续接入在线客服、工单系统或 Telegram/微信客服入口，这个页面可以继续扩展成统一支持中心。</p>
+        </div>
+    </section>
+</section>
+{% endblock %}

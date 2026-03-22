@@ -16,6 +16,7 @@ class AccountAuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(EmailVerificationCode.objects.filter(email="newuser@example.com").exists())
         self.assertEqual(len(mail.outbox), 1)
+        self.assertContains(response, "cooldown_seconds")
 
     def test_signup_requires_valid_email_code(self):
         verification = EmailVerificationCode.objects.create(
@@ -116,3 +117,9 @@ class AccountAuthFlowTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "验证码不正确")
+
+    def test_login_captcha_refresh_endpoint_returns_new_code(self):
+        client = Client()
+        response = client.get(reverse("accounts:login_captcha"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "captcha")

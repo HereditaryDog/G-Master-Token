@@ -88,6 +88,12 @@ class StoreOrderFlowTests(TestCase):
         self.assertContains(list_response, "测试教程")
         self.assertContains(detail_response, "教程正文")
 
+    def test_support_page_renders(self):
+        client = Client()
+        response = client.get(reverse("shop:support"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "客服与售后支持")
+
     def test_checkout_page_shows_active_and_reserved_payment_gateways(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))

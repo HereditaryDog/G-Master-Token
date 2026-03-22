@@ -39,15 +39,38 @@ document.addEventListener("DOMContentLoaded", function () {
     const sendButton = document.getElementById("send-code-button");
     const statusText = document.getElementById("send-code-status");
     const csrfToken = document.querySelector("#signup-form input[name='csrfmiddlewaretoken']").value;
+    let countdownTimer = null;
 
     if (!sendButton || !emailInput) {
         return;
+    }
+
+    function startCountdown(seconds) {
+        let remaining = Number(seconds) || 60;
+        sendButton.disabled = true;
+        sendButton.textContent = `${remaining}s`;
+
+        countdownTimer = window.setInterval(function () {
+            remaining -= 1;
+            if (remaining <= 0) {
+                window.clearInterval(countdownTimer);
+                countdownTimer = null;
+                sendButton.disabled = false;
+                sendButton.textContent = "发送验证码";
+                return;
+            }
+            sendButton.textContent = `${remaining}s`;
+        }, 1000);
     }
 
     sendButton.addEventListener("click", async function () {
         const email = emailInput.value.trim();
         if (!email) {
             statusText.textContent = "请先输入邮箱地址。";
+            return;
+        }
+
+        if (countdownTimer) {
             return;
         }
 
@@ -65,10 +88,16 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             const data = await response.json();
             statusText.textContent = data.message;
+            if (data.ok) {
+                startCountdown(data.cooldown_seconds || 60);
+            } else {
+                sendButton.disabled = false;
+                sendButton.textContent = "发送验证码";
+            }
         } catch (error) {
             statusText.textContent = "发送失败，请稍后重试。";
-        } finally {
             sendButton.disabled = false;
+            sendButton.textContent = "发送验证码";
         }
     });
 });

@@ -23,6 +23,7 @@ from .views import (
     ProductDetailView,
     StartPaymentView,
     StorefrontView,
+    SupportView,
     StripeWebhookView,
 )
 
@@ -33,6 +34,7 @@ urlpatterns = [
     path("help/", HelpCenterView.as_view(), name="help_center"),
     path("help/<slug:slug>/", HelpArticleDetailView.as_view(), name="help_article_detail"),
     path("order-lookup/", GuestOrderLookupView.as_view(), name="order_lookup"),
+    path("support/", SupportView.as_view(), name="support"),
     path("dashboard/", MerchantDashboardView.as_view(), name="merchant_dashboard"),
     path("dashboard/products/", MerchantProductListView.as_view(), name="merchant_products"),
     path("dashboard/products/new/", MerchantProductCreateView.as_view(), name="merchant_product_create"),

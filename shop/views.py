@@ -244,6 +244,10 @@ class GuestOrderLookupView(FormView):
         return self.render_to_response(self.get_context_data(form=form, order=order))
 
 
+class SupportView(TemplateView):
+    template_name = "shop/support.html"
+
+
 class AnnouncementDetailView(DetailView):
     template_name = "shop/announcement_detail.html"
     model = SiteAnnouncement

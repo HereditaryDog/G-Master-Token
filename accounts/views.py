@@ -1,5 +1,6 @@
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
+from django.conf import settings
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
@@ -50,7 +51,26 @@ class SendSignupCodeView(View):
         try:
             send_signup_email_code(email)
         except ValueError as exc:
-            return JsonResponse({"ok": False, "message": str(exc)}, status=400)
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "message": str(exc),
+                    "cooldown_seconds": settings.EMAIL_CODE_COOLDOWN_SECONDS,
+                },
+                status=400,
+            )
         except Exception:
             return JsonResponse({"ok": False, "message": "验证码发送失败，请检查邮箱配置。"}, status=500)
-        return JsonResponse({"ok": True, "message": "验证码已发送，请查收邮箱。"})
+        return JsonResponse(
+            {
+                "ok": True,
+                "message": "验证码已发送，请查收邮箱。",
+                "cooldown_seconds": settings.EMAIL_CODE_COOLDOWN_SECONDS,
+                "expiry_minutes": settings.EMAIL_CODE_EXPIRY_MINUTES,
+            }
+        )
+
+
+class RefreshLoginCaptchaView(View):
+    def get(self, request, *args, **kwargs):
+        return JsonResponse({"ok": True, "captcha": refresh_login_captcha(request)})
