@@ -1,6 +1,6 @@
 # web_0.0.1
 
-当前版本：`0.0.2`
+当前版本：`0.0.3`
 
 一个面向数字点卡与 Token 充值场景的 Django 商城项目，包含前台商城、订单系统、用户认证、商家后台、帮助中心、支付抽象层和供货接口抽象层。
 
@@ -186,6 +186,12 @@ DJANGO_SECURE_HSTS_PRELOAD=true
 ## 更新日志
 
 完整记录见 [CHANGELOG.md](C:\Users\Administrator\Desktop\web_test\CHANGELOG.md)
+
+### 0.0.3
+
+- 登录页支持点击刷新验证码
+- 注册页发送邮箱验证码支持倒计时
+- 新增客服与售后支持页面
 
 ### 0.0.2
 
