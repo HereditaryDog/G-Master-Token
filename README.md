@@ -1,6 +1,6 @@
 # web_0.0.1
 
-当前版本：`0.0.3`
+当前版本：`0.0.4`
 
 一个面向数字点卡与 Token 充值场景的 Django 商城项目，包含前台商城、订单系统、用户认证、商家后台、帮助中心、支付抽象层和供货接口抽象层。
 
@@ -99,7 +99,11 @@ DJANGO_SECRET_KEY=replace-me
 DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
 SITE_NAME=web_0.0.1
+SITE_BASE_URL=
 ```
+
+`SITE_BASE_URL` 用于密码重置邮件、通知邮件等需要生成外部可访问链接的场景。
+本地开发不填也可以；如果要让手机或外部设备打开邮件里的链接，需要配置成你的局域网地址或正式域名，例如 `http://192.168.1.8:8010` 或 `https://example.com`。
 
 ### 邮件
 
@@ -185,7 +189,15 @@ DJANGO_SECURE_HSTS_PRELOAD=true
 
 ## 更新日志
 
-完整记录见 [CHANGELOG.md](C:\Users\Administrator\Desktop\web_test\CHANGELOG.md)
+完整记录见 [CHANGELOG.md](CHANGELOG.md)
+
+### 0.0.4
+
+- 新增密码找回、重置密码、修改密码完整链路
+- 新增账号中心入口与账号资料展示
+- 修复注册验证码发送失败后的冷却记录残留问题
+- 优化商家后台总览的统计卡片与最近订单布局
+- 支持通过 `SITE_BASE_URL` 生成外部可访问的密码重置链接
 
 ### 0.0.3
 

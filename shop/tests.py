@@ -108,6 +108,14 @@ class StoreOrderFlowTests(TestCase):
         self.assertContains(response, "USDT")
         self.assertContains(response, "银行卡转账")
 
+    def test_authenticated_storefront_shows_account_center_entry(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        response = client.get(reverse("shop:storefront"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "账号中心")
+        self.assertContains(response, reverse("shop:account_center"))
+
     def test_payment_gateway_registry_exposes_future_channels(self):
         active_codes = [gateway.code for gateway in list_active_payment_gateways()]
         reserved_codes = [gateway.code for gateway in list_reserved_payment_gateways()]

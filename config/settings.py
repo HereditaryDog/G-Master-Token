@@ -22,6 +22,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 SITE_NAME = os.getenv("SITE_NAME", "web_0.0.1")
+SITE_BASE_URL = os.getenv("SITE_BASE_URL", "").strip().rstrip("/")
 PROJECT_VERSION = os.getenv("PROJECT_VERSION", VERSION)
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")

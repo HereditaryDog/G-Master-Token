@@ -30,6 +30,7 @@
             {% endfor %}
             <button type="submit" class="primary-button">登录</button>
         </form>
+        <p class="muted">忘记密码？<a href="{% url 'password_reset' %}">通过邮箱找回</a></p>
         <p class="muted">还没有账号？<a href="{% url 'accounts:signup' %}">去注册</a></p>
     </div>
 </section>

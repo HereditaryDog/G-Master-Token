@@ -1,6 +1,12 @@
 from django import forms
 from django.contrib.auth import authenticate
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth.forms import (
+    AuthenticationForm,
+    PasswordChangeForm,
+    PasswordResetForm,
+    SetPasswordForm,
+    UserCreationForm,
+)
 from django.utils import timezone
 
 from .models import EmailVerificationCode, User
@@ -97,3 +103,31 @@ class AccountLoginForm(AuthenticationForm):
                 )
             self.confirm_login_allowed(self.user_cache)
         return cleaned_data
+
+
+class AccountPasswordResetForm(PasswordResetForm):
+    email = forms.EmailField(label="邮箱地址")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["email"].widget.attrs.update({"placeholder": "输入注册时使用的邮箱地址"})
+
+
+class AccountSetPasswordForm(SetPasswordForm):
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        self.fields["new_password1"].label = "新密码"
+        self.fields["new_password2"].label = "确认新密码"
+        self.fields["new_password1"].widget.attrs.update({"placeholder": "输入新的登录密码"})
+        self.fields["new_password2"].widget.attrs.update({"placeholder": "再次输入新密码"})
+
+
+class AccountPasswordChangeForm(PasswordChangeForm):
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        self.fields["old_password"].label = "当前密码"
+        self.fields["new_password1"].label = "新密码"
+        self.fields["new_password2"].label = "确认新密码"
+        self.fields["old_password"].widget.attrs.update({"placeholder": "输入当前登录密码"})
+        self.fields["new_password1"].widget.attrs.update({"placeholder": "输入新的登录密码"})
+        self.fields["new_password2"].widget.attrs.update({"placeholder": "再次输入新密码"})

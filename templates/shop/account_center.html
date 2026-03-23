@@ -1,15 +1,43 @@
 {% extends "base.html" %}
 
-{% block title %}我的订单 | {{ site_name }}{% endblock %}
+{% block title %}账号中心 | {{ site_name }}{% endblock %}
 
 {% block content %}
 <section class="content-card">
     <div class="section-heading">
         <div>
             <p class="eyebrow">Account Center</p>
-            <h1>我的订单</h1>
+            <h1>账号中心</h1>
+        </div>
+        <a class="ghost-button" href="{% url 'password_change' %}">修改密码</a>
+    </div>
+
+    <div class="table-card">
+        <div class="row-line">
+            <span>用户名</span>
+            <strong>{{ request.user.username }}</strong>
+        </div>
+        <div class="row-line">
+            <span>邮箱地址</span>
+            <strong>{{ request.user.email|default:"-" }}</strong>
+        </div>
+        <div class="row-line">
+            <span>邮箱验证</span>
+            <strong>{% if request.user.email_verified %}已验证{% else %}未验证{% endif %}</strong>
+        </div>
+        <div class="row-line">
+            <span>手机号</span>
+            <strong>{{ request.user.phone|default:"-" }}</strong>
         </div>
     </div>
+
+    <div class="section-heading mini">
+        <div>
+            <p class="eyebrow">Orders</p>
+            <h2>我的订单</h2>
+        </div>
+    </div>
+
     <div class="table-card">
         <table>
             <thead>
