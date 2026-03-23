@@ -7,12 +7,16 @@
     {% include "shop/partials/merchant_sidebar.html" %}
 
     <div class="merchant-main">
-        <section class="section-heading">
-            <div>
+        <section class="content-card product-desk-hero">
+            <div class="product-desk-hero__copy">
                 <p class="eyebrow">Products</p>
                 <h1>商品管理</h1>
+                <p class="muted">统一查看商品状态、库存表现和上架情况，并快速进入编辑与上下架操作。</p>
             </div>
-            <div class="hero-actions">
+        </section>
+
+        <section class="content-card soft product-filter-card">
+            <div class="toolbar-cluster">
                 <form method="get" class="filter-toolbar filter-toolbar--compact">
                     <label class="field">
                         <span>搜索</span>
@@ -27,7 +31,9 @@
                         <a class="ghost-button" href="{% url 'shop:merchant_products' %}">重置</a>
                     </div>
                 </form>
-                <a class="primary-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
+                <div class="toolbar-cluster__cta">
+                    <a class="primary-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
+                </div>
             </div>
         </section>
 
