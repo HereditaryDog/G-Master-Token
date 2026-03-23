@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}客服工单 | {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="merchant-shell">
+    {% include "shop/partials/merchant_sidebar.html" %}
+
+    <div class="merchant-main">
+        <section class="content-card support-desk-hero">
+            <div class="support-desk-hero__copy">
+                <p class="eyebrow">Support Desk</p>
+                <h1>客服工单</h1>
+                <p class="muted">集中查看待处理问题、用户补充信息和工单状态，减少来回切表格。</p>
+            </div>
+            <div class="support-desk-stats">
+                <article class="support-desk-stat support-desk-stat--danger">
+                    <strong>{{ ticket_stats.pending_support }}</strong>
+                    <span>待客服处理</span>
+                </article>
+                <article class="support-desk-stat">
+                    <strong>{{ ticket_stats.pending_user }}</strong>
+                    <span>待用户回复</span>
+                </article>
+                <article class="support-desk-stat support-desk-stat--success">
+                    <strong>{{ ticket_stats.resolved }}</strong>
+                    <span>已解决</span>
+                </article>
+                <article class="support-desk-stat support-desk-stat--success">
+                    <strong>{{ ticket_stats.closed }}</strong>
+                    <span>已关闭</span>
+                </article>
+            </div>
+        </section>
+
+        <section class="content-card soft support-filter-card">
+            <form method="get" class="filter-toolbar support-filter-toolbar">
+                <label class="field">
+                    <span>搜索</span>
+                    {{ filter_form.query }}
+                </label>
+                <label class="field">
+                    <span>状态</span>
+                    {{ filter_form.status }}
+                </label>
+                <label class="field">
+                    <span>分类</span>
+                    {{ filter_form.category }}
+                </label>
+                <label class="field">
+                    <span>优先级</span>
+                    {{ filter_form.priority }}
+                </label>
+                <div class="filter-toolbar__actions">
+                    <button type="submit" class="primary-button">筛选</button>
+                    <a class="ghost-button" href="{% url 'shop:merchant_support_tickets' %}">重置</a>
+                </div>
+            </form>
+        </section>
+
+        <section class="content-card soft">
+            <div class="support-ticket-board">
+                {% for ticket in tickets %}
+                    <article class="support-ticket-card">
+                        <div class="support-ticket-card__main">
+                            <div class="support-ticket-card__eyebrow">{{ ticket.ticket_no }}</div>
+                            <h3>{{ ticket.subject }}</h3>
+                            <p class="muted">
+                                {% if ticket.user %}{{ ticket.user.username }}{% else %}访客{% endif %}
+                                · {{ ticket.contact_email }}
+                                {% if ticket.order %}· 订单 {{ ticket.order.order_no }}{% endif %}
+                            </p>
+                        </div>
+                        <div class="support-ticket-card__side">
+                            <div class="support-ticket-card__meta">
+                                <span class="pill {% if ticket.status == 'pending_support' %}pill--danger{% elif ticket.status == 'resolved' or ticket.status == 'closed' %}pill--success{% elif ticket.status == 'pending_user' %}pill--warning{% endif %}">
+                                    {{ ticket.get_status_display }}
+                                </span>
+                                <span class="detail-chip detail-chip--plain">{{ ticket.get_category_display }}</span>
+                                <span class="detail-chip detail-chip--plain">{{ ticket.get_priority_display }}优先级</span>
+                            </div>
+                            <small class="muted">最后更新 {{ ticket.last_message_at|date:"Y-m-d H:i" }}</small>
+                            <div class="support-ticket-card__actions">
+                                <a class="ghost-button" href="{% url 'shop:merchant_support_ticket_detail' ticket.ticket_no %}">处理工单</a>
+                            </div>
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="table-card compact">
+                        <p class="muted">当前没有客服工单。</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</section>
+{% endblock %}

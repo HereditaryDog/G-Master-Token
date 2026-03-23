@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}工单详情 | {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="content-card support-thread-shell">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Ticket Detail</p>
+            <h1>{{ ticket.subject }}</h1>
+            <p class="muted">{{ ticket.ticket_no }} · {{ ticket.get_category_display }} · {{ ticket.get_priority_display }}优先级</p>
+        </div>
+        <span class="pill">{{ ticket.get_status_display }}</span>
+    </div>
+
+    <div class="support-ticket-meta-grid">
+        <div class="row-line"><span>联系邮箱</span><strong>{{ ticket.contact_email }}</strong></div>
+        <div class="row-line"><span>关联订单</span><strong>{% if ticket.order %}{{ ticket.order.order_no }}{% else %}-{% endif %}</strong></div>
+        <div class="row-line"><span>创建时间</span><strong>{{ ticket.created_at|date:"Y-m-d H:i" }}</strong></div>
+        <div class="row-line"><span>最后更新</span><strong>{{ ticket.last_message_at|date:"Y-m-d H:i" }}</strong></div>
+    </div>
+
+    <section class="support-thread">
+        {% for message in ticket.messages.all %}
+            <article class="support-message support-message--{{ message.sender_role }}">
+                <div class="support-message__head">
+                    <strong>
+                        {% if message.sender_role == "support" %}客服回复{% elif message.sender_role == "system" %}系统更新{% else %}我的留言{% endif %}
+                    </strong>
+                    <span class="muted">{{ message.created_at|date:"Y-m-d H:i" }}</span>
+                </div>
+                <p>{{ message.body|linebreaksbr }}</p>
+            </article>
+        {% empty %}
+            <div class="table-card compact">
+                <p class="muted">当前工单还没有消息记录。</p>
+            </div>
+        {% endfor %}
+    </section>
+
+    {% if ticket.status != "closed" %}
+        <section class="content-card soft">
+            <h3>继续补充说明</h3>
+            <form method="post" class="form-grid">
+                {% csrf_token %}
+                {{ reply_form.non_field_errors }}
+                {% for field in reply_form %}
+                    <label class="field">
+                        <span>{{ field.label }}</span>
+                        {{ field }}
+                        {% if field.errors %}
+                            <small class="error-text">{{ field.errors|join:", " }}</small>
+                        {% endif %}
+                    </label>
+                {% endfor %}
+                <button type="submit" class="primary-button">提交回复</button>
+            </form>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}

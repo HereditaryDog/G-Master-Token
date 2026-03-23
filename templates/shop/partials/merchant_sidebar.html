@@ -8,6 +8,7 @@
         <a class="{% if merchant_tab == 'products' %}active{% endif %}" href="{% url 'shop:merchant_products' %}">商品管理</a>
         <a class="{% if merchant_tab == 'inventory' %}active{% endif %}" href="{% url 'shop:merchant_inventory' %}">库存卡密</a>
         <a class="{% if merchant_tab == 'orders' %}active{% endif %}" href="{% url 'shop:merchant_orders' %}">订单管理</a>
+        <a class="{% if merchant_tab == 'support' %}active{% endif %}" href="{% url 'shop:merchant_support_tickets' %}">客服工单</a>
         <a href="/admin/">高级后台</a>
     </nav>
     <div class="merchant-note">

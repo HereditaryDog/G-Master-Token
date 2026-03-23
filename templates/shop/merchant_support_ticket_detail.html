@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}处理工单 | {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="merchant-shell">
+    {% include "shop/partials/merchant_sidebar.html" %}
+
+    <div class="merchant-main">
+        <section class="section-heading">
+            <div>
+                <p class="eyebrow">Support Ticket</p>
+                <h1>{{ ticket.ticket_no }}</h1>
+                <p class="muted">{{ ticket.subject }}</p>
+            </div>
+            <span class="pill">{{ ticket.get_status_display }}</span>
+        </section>
+
+        <section class="dashboard-grid">
+            <div class="content-card soft">
+                <h3>工单信息</h3>
+                <div class="row-line"><span>提交用户</span><strong>{% if ticket.user %}{{ ticket.user.username }}{% else %}访客{% endif %}</strong></div>
+                <div class="row-line"><span>联系邮箱</span><strong>{{ ticket.contact_email }}</strong></div>
+                <div class="row-line"><span>关联订单</span><strong>{% if ticket.order %}{{ ticket.order.order_no }}{% else %}-{% endif %}</strong></div>
+                <div class="row-line"><span>问题分类</span><strong>{{ ticket.get_category_display }}</strong></div>
+                <div class="row-line"><span>优先级</span><strong>{{ ticket.get_priority_display }}</strong></div>
+                <div class="row-line"><span>处理人</span><strong>{% if ticket.merchant_assignee %}{{ ticket.merchant_assignee.username }}{% else %}-{% endif %}</strong></div>
+            </div>
+
+            <div class="content-card soft">
+                <h3>回复与状态处理</h3>
+                <form method="post" class="form-grid">
+                    {% csrf_token %}
+                    {{ reply_form.non_field_errors }}
+                    {% for field in reply_form %}
+                        <label class="field">
+                            <span>{{ field.label }}</span>
+                            {{ field }}
+                            {% if field.errors %}
+                                <small class="error-text">{{ field.errors|join:", " }}</small>
+                            {% endif %}
+                        </label>
+                    {% endfor %}
+                    <button type="submit" class="primary-button">提交处理结果</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="content-card soft">
+            <h3>工单消息</h3>
+            <div class="support-thread">
+                {% for message in ticket.messages.all %}
+                    <article class="support-message support-message--{{ message.sender_role }}">
+                        <div class="support-message__head">
+                            <strong>
+                                {% if message.sender_role == "support" %}客服{% elif message.sender_role == "system" %}系统{% else %}用户{% endif %}
+                            </strong>
+                            <span class="muted">{{ message.created_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        <p>{{ message.body|linebreaksbr }}</p>
+                    </article>
+                {% empty %}
+                    <div class="table-card compact">
+                        <p class="muted">当前没有消息记录。</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</section>
+{% endblock %}

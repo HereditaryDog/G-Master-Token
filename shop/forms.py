@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import CardCode, Order, Product
+from .models import CardCode, Order, Product, SupportTicket
 
 
 class AddToCartForm(forms.Form):
@@ -139,3 +139,55 @@ class CardCodeBatchForm(forms.Form):
             "duplicate_count": len(duplicate_in_upload) + len(existing_codes),
             "duplicate_samples": duplicate_samples[:12],
         }
+
+
+class SupportTicketCreateForm(forms.Form):
+    order = forms.ModelChoiceField(queryset=Order.objects.none(), label="关联订单", required=False)
+    category = forms.ChoiceField(label="问题分类", choices=SupportTicket.Category.choices)
+    priority = forms.ChoiceField(label="优先级", choices=SupportTicket.Priority.choices)
+    subject = forms.CharField(label="标题", max_length=160)
+    contact_email = forms.EmailField(label="联系邮箱")
+    body = forms.CharField(label="问题描述", widget=forms.Textarea(attrs={"rows": 6}))
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        if user and user.is_authenticated:
+            self.fields["order"].queryset = user.orders.order_by("-created_at")
+            self.fields["contact_email"].initial = user.email
+        else:
+            self.fields["order"].queryset = Order.objects.none()
+        self.fields["subject"].widget.attrs.update({"placeholder": "例如：卡密异常 / 支付成功未发货"})
+        self.fields["contact_email"].widget.attrs.update({"placeholder": "用于接收工单通知"})
+        self.fields["body"].widget.attrs.update({"placeholder": "请尽量写清订单号、异常现象、发生时间和已做过的操作。"})
+
+
+class SupportTicketReplyForm(forms.Form):
+    body = forms.CharField(label="回复内容", widget=forms.Textarea(attrs={"rows": 5}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["body"].widget.attrs.update({"placeholder": "补充问题细节，或回复客服处理结果。"})
+
+
+class MerchantSupportTicketFilterForm(forms.Form):
+    query = forms.CharField(label="搜索", required=False, max_length=120)
+    status = forms.ChoiceField(label="工单状态", required=False)
+    category = forms.ChoiceField(label="问题分类", required=False)
+    priority = forms.ChoiceField(label="优先级", required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["query"].widget.attrs.update({"placeholder": "工单号 / 用户名 / 邮箱 / 标题"})
+        self.fields["status"].choices = [("", "全部状态"), *SupportTicket.Status.choices]
+        self.fields["category"].choices = [("", "全部分类"), *SupportTicket.Category.choices]
+        self.fields["priority"].choices = [("", "全部优先级"), *SupportTicket.Priority.choices]
+
+
+class MerchantSupportTicketReplyForm(forms.Form):
+    status = forms.ChoiceField(label="更新状态", choices=SupportTicket.Status.choices)
+    body = forms.CharField(label="回复内容", widget=forms.Textarea(attrs={"rows": 5}), required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["body"].widget.attrs.update({"placeholder": "填写处理结果、补发说明或让用户补充的信息。"})

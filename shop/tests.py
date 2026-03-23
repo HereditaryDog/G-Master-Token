@@ -1,6 +1,7 @@
 from django.core import mail
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from shop.models import (
@@ -13,6 +14,8 @@ from shop.models import (
     ProductCategory,
     SensitiveOperationLog,
     SiteAnnouncement,
+    SupportTicket,
+    SupportTicketMessage,
 )
 from shop.services.order_flow import create_single_item_order, mark_order_paid
 from shop.services.payment import get_default_gateway_code, list_active_payment_gateways, list_reserved_payment_gateways
@@ -462,3 +465,167 @@ class SecurityMiddlewareTests(TestCase):
         self.client.force_login(owner)
         response = self.client.get(reverse("shop:merchant_dashboard"), REMOTE_ADDR="127.0.0.1")
         self.assertEqual(response.status_code, 403)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class SupportSystemTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="support-owner",
+            password="ChangeMe123!",
+            email="support-owner@example.com",
+            is_staff=True,
+            is_merchant=True,
+        )
+        self.user = User.objects.create_user(
+            username="support-user",
+            password="Buyer123!",
+            email="support-user@example.com",
+            email_verified=True,
+        )
+        self.other = User.objects.create_user(
+            username="other-user",
+            password="Other123!",
+            email="other-user@example.com",
+        )
+        category = ProductCategory.objects.create(name="客服分类", slug="support-category")
+        product = Product.objects.create(
+            category=category,
+            title="Support Card",
+            slug="support-card",
+            summary="客服测试商品",
+            description="客服测试商品详情",
+            face_value="10.00",
+            token_amount=1000,
+            price="10.00",
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+            is_active=True,
+        )
+        self.order = create_single_item_order(self.user, product, 1)
+
+    def test_authenticated_user_can_create_support_ticket(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("shop:support"),
+            {
+                "order": self.order.id,
+                "category": SupportTicket.Category.ORDER,
+                "priority": SupportTicket.Priority.NORMAL,
+                "subject": "订单状态异常",
+                "contact_email": self.user.email,
+                "body": "支付后长时间未更新，请帮忙核查。",
+            },
+        )
+        ticket = SupportTicket.objects.get()
+        self.assertRedirects(response, reverse("shop:support_ticket_detail", args=[ticket.ticket_no]))
+        self.assertEqual(ticket.user, self.user)
+        self.assertEqual(ticket.order, self.order)
+        self.assertEqual(ticket.status, SupportTicket.Status.PENDING_SUPPORT)
+        self.assertEqual(ticket.messages.count(), 1)
+        self.assertEqual(ticket.messages.first().sender_role, SupportTicketMessage.SenderRole.USER)
+
+    def test_user_cannot_access_other_users_ticket(self):
+        ticket = SupportTicket.objects.create(
+            user=self.user,
+            order=self.order,
+            contact_email=self.user.email,
+            category=SupportTicket.Category.ORDER,
+            priority=SupportTicket.Priority.NORMAL,
+            subject="订单问题",
+        )
+        SupportTicketMessage.objects.create(
+            ticket=ticket,
+            sender=self.user,
+            sender_role=SupportTicketMessage.SenderRole.USER,
+            body="需要客服处理。",
+        )
+        ticket.status = SupportTicket.Status.PENDING_SUPPORT
+        ticket.save(update_fields=["status", "updated_at"])
+        self.client.force_login(self.other)
+        response = self.client.get(reverse("shop:support_ticket_detail", args=[ticket.ticket_no]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_merchant_can_reply_and_update_support_ticket(self):
+        ticket = SupportTicket.objects.create(
+            user=self.user,
+            order=self.order,
+            contact_email=self.user.email,
+            category=SupportTicket.Category.ORDER,
+            priority=SupportTicket.Priority.NORMAL,
+            subject="订单问题",
+        )
+        SupportTicketMessage.objects.create(
+            ticket=ticket,
+            sender=self.user,
+            sender_role=SupportTicketMessage.SenderRole.USER,
+            body="请帮我查一下发货情况。",
+        )
+        ticket.status = SupportTicket.Status.PENDING_SUPPORT
+        ticket.save(update_fields=["status", "updated_at"])
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_support_ticket_detail", args=[ticket.ticket_no]),
+            {"status": SupportTicket.Status.PENDING_USER, "body": "已经核验订单，请补充一下异常截图。"},
+        )
+        self.assertRedirects(response, reverse("shop:merchant_support_ticket_detail", args=[ticket.ticket_no]))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, SupportTicket.Status.PENDING_USER)
+        self.assertEqual(ticket.messages.count(), 2)
+        self.assertEqual(ticket.messages.last().sender_role, SupportTicketMessage.SenderRole.SUPPORT)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(ticket.ticket_no, mail.outbox[0].body)
+
+    def test_merchant_status_only_update_sends_notification(self):
+        ticket = SupportTicket.objects.create(
+            user=self.user,
+            order=self.order,
+            contact_email=self.user.email,
+            category=SupportTicket.Category.ORDER,
+            priority=SupportTicket.Priority.NORMAL,
+            subject="状态变更测试",
+        )
+        SupportTicketMessage.objects.create(
+            ticket=ticket,
+            sender=self.user,
+            sender_role=SupportTicketMessage.SenderRole.USER,
+            body="请更新一下状态。",
+        )
+        ticket.status = SupportTicket.Status.PENDING_SUPPORT
+        ticket.save(update_fields=["status", "updated_at"])
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_support_ticket_detail", args=[ticket.ticket_no]),
+            {"status": SupportTicket.Status.RESOLVED, "body": ""},
+        )
+        self.assertRedirects(response, reverse("shop:merchant_support_ticket_detail", args=[ticket.ticket_no]))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, SupportTicket.Status.RESOLVED)
+        self.assertEqual(ticket.messages.last().sender_role, SupportTicketMessage.SenderRole.SYSTEM)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("已解决", mail.outbox[0].body)
+
+    def test_user_cannot_reply_to_closed_ticket(self):
+        ticket = SupportTicket.objects.create(
+            user=self.user,
+            order=self.order,
+            contact_email=self.user.email,
+            category=SupportTicket.Category.ORDER,
+            priority=SupportTicket.Priority.NORMAL,
+            subject="已关闭工单",
+            status=SupportTicket.Status.CLOSED,
+            closed_at=timezone.now(),
+        )
+        SupportTicketMessage.objects.create(
+            ticket=ticket,
+            sender=self.owner,
+            sender_role=SupportTicketMessage.SenderRole.SUPPORT,
+            body="此工单已关闭。",
+        )
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("shop:support_ticket_detail", args=[ticket.ticket_no]),
+            {"body": "我还想继续补充说明"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("shop:support_ticket_detail", args=[ticket.ticket_no]))
+        self.assertEqual(ticket.messages.count(), 1)

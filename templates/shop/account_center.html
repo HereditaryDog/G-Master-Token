@@ -3,119 +3,124 @@
 {% block title %}账号中心 | {{ site_name }}{% endblock %}
 
 {% block content %}
-<section class="content-card">
-    <div class="section-heading">
-        <div>
-            <p class="eyebrow">Account Center</p>
-            <h1>账号中心</h1>
+<section class="account-center-shell">
+    <section class="content-card account-overview-card">
+        <div class="section-heading section-heading--account">
+            <div class="account-hero-copy">
+                <p class="eyebrow">Account Center</p>
+                <h1>账号中心</h1>
+                <p class="muted">统一查看账号资料、订单记录和常用操作，减少来回跳页。</p>
+            </div>
+            <a class="ghost-button" href="{% url 'password_change' %}">修改密码</a>
         </div>
-        <a class="ghost-button" href="{% url 'password_change' %}">修改密码</a>
-    </div>
 
-    <div class="table-card">
-        <div class="row-line">
-            <span>用户名</span>
-            <strong>{{ request.user.username }}</strong>
+        <div class="account-summary-grid">
+            <article class="account-summary-card">
+                <span>用户名</span>
+                <strong>{{ request.user.username }}</strong>
+            </article>
+            <article class="account-summary-card">
+                <span>邮箱地址</span>
+                <strong>{{ request.user.email|default:"-" }}</strong>
+            </article>
+            <article class="account-summary-card">
+                <span>邮箱验证</span>
+                <strong>{% if request.user.email_verified %}已验证{% else %}未验证{% endif %}</strong>
+            </article>
+            <article class="account-summary-card">
+                <span>手机号</span>
+                <strong>{{ request.user.phone|default:"-" }}</strong>
+            </article>
         </div>
-        <div class="row-line">
-            <span>邮箱地址</span>
-            <strong>{{ request.user.email|default:"-" }}</strong>
-        </div>
-        <div class="row-line">
-            <span>邮箱验证</span>
-            <strong>{% if request.user.email_verified %}已验证{% else %}未验证{% endif %}</strong>
-        </div>
-        <div class="row-line">
-            <span>手机号</span>
-            <strong>{{ request.user.phone|default:"-" }}</strong>
-        </div>
-    </div>
+    </section>
 
-    <div class="section-heading mini">
-        <div>
-            <p class="eyebrow">Orders</p>
-            <h2>我的订单</h2>
+    <section class="content-card soft account-orders-card">
+        <div class="section-heading mini">
+            <div>
+                <p class="eyebrow">Orders</p>
+                <h2>我的订单</h2>
+            </div>
         </div>
-    </div>
 
-    <form method="get" class="filter-toolbar">
-        <label class="field">
-            <span>搜索</span>
-            <input type="text" name="q" value="{{ current_query }}" placeholder="订单号 / 商品名 / 支付流水">
-        </label>
-        <label class="field">
-            <span>订单状态</span>
-            <select name="status">
-                <option value="">全部订单状态</option>
-                {% for value, label in status_choices %}
-                    <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </label>
-        <label class="field">
-            <span>支付状态</span>
-            <select name="payment_status">
-                <option value="">全部支付状态</option>
-                {% for value, label in payment_status_choices %}
-                    <option value="{{ value }}" {% if current_payment_status == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </label>
-        <label class="field">
-            <span>开始日期</span>
-            <input type="date" name="date_from" value="{{ current_date_from }}">
-        </label>
-        <label class="field">
-            <span>结束日期</span>
-            <input type="date" name="date_to" value="{{ current_date_to }}">
-        </label>
-        <div class="filter-toolbar__actions">
-            <button type="submit" class="primary-button">筛选订单</button>
-            <a class="ghost-button" href="{% url 'shop:account_center' %}">重置</a>
-        </div>
-    </form>
+        <form method="get" class="filter-toolbar">
+            <label class="field">
+                <span>搜索</span>
+                <input type="text" name="q" value="{{ current_query }}" placeholder="订单号 / 商品名 / 支付流水">
+            </label>
+            <label class="field">
+                <span>订单状态</span>
+                <select name="status">
+                    <option value="">全部订单状态</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="field">
+                <span>支付状态</span>
+                <select name="payment_status">
+                    <option value="">全部支付状态</option>
+                    {% for value, label in payment_status_choices %}
+                        <option value="{{ value }}" {% if current_payment_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="field">
+                <span>开始日期</span>
+                <input type="date" name="date_from" value="{{ current_date_from }}">
+            </label>
+            <label class="field">
+                <span>结束日期</span>
+                <input type="date" name="date_to" value="{{ current_date_to }}">
+            </label>
+            <div class="filter-toolbar__actions">
+                <button type="submit" class="primary-button">筛选订单</button>
+                <a class="ghost-button" href="{% url 'shop:account_center' %}">重置</a>
+            </div>
+        </form>
 
-    <div class="table-card">
-        <table>
-            <thead>
-                <tr>
-                    <th>订单号</th>
-                    <th>商品</th>
-                    <th>状态</th>
-                    <th>支付</th>
-                    <th>金额</th>
-                    <th>时间</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for order in orders %}
+        <div class="table-card">
+            <table>
+                <thead>
                     <tr>
-                        <td>{{ order.order_no }}</td>
-                        <td>{% with first_item=order.items.all|first %}{{ first_item.product_title|default:"-" }}{% endwith %}</td>
-                        <td>{{ order.get_status_display }}</td>
-                        <td>{{ order.get_payment_status_display }}</td>
-                        <td>HK${{ order.total_amount }}</td>
-                        <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
-                        <td>
-                            <div class="table-actions">
-                                <a class="ghost-button" href="{% url 'shop:order_detail' order.order_no %}">查看</a>
-                                <form method="post" action="{% url 'shop:reorder' order.order_no %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="ghost-button">再次购买</button>
-                                </form>
-                                <button type="button" class="ghost-button js-copy-trigger" data-copy-text="{{ order.order_no }}">复制订单号</button>
-                            </div>
-                        </td>
+                        <th>订单号</th>
+                        <th>商品</th>
+                        <th>状态</th>
+                        <th>支付</th>
+                        <th>金额</th>
+                        <th>时间</th>
+                        <th>操作</th>
                     </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="7">你还没有订单，先去首页挑一个点卡。</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                        <tr>
+                            <td>{{ order.order_no }}</td>
+                            <td>{% with first_item=order.items.all|first %}{{ first_item.product_title|default:"-" }}{% endwith %}</td>
+                            <td>{{ order.get_status_display }}</td>
+                            <td>{{ order.get_payment_status_display }}</td>
+                            <td>HK${{ order.total_amount }}</td>
+                            <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <a class="ghost-button" href="{% url 'shop:order_detail' order.order_no %}">查看</a>
+                                    <form method="post" action="{% url 'shop:reorder' order.order_no %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="ghost-button">再次购买</button>
+                                    </form>
+                                    <button type="button" class="ghost-button js-copy-trigger" data-copy-text="{{ order.order_no }}">复制订单号</button>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">你还没有订单，先去首页挑一个点卡。</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 </section>
 
 <script>

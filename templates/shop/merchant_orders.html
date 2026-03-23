@@ -7,13 +7,17 @@
     {% include "shop/partials/merchant_sidebar.html" %}
 
     <div class="merchant-main">
-        <section class="section-heading">
-            <div>
+        <section class="content-card order-desk-hero">
+            <div class="order-desk-hero__copy">
                 <p class="eyebrow">Orders</p>
                 <h1>订单管理</h1>
+                <p class="muted">按订单号、买家、支付状态和时间范围快速筛选订单，并直接进入处理动作。</p>
             </div>
-            <form method="get" class="filter-toolbar">
-                <label class="field">
+        </section>
+
+        <section class="content-card soft order-filter-card">
+            <form method="get" class="filter-toolbar order-filter-toolbar">
+                <label class="field order-filter-toolbar__search">
                     <span>搜索</span>
                     {{ filter_form.query }}
                 </label>

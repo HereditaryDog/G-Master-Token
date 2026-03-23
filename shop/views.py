@@ -21,7 +21,11 @@ from .forms import (
     GuestOrderLookupForm,
     MerchantOrderFilterForm,
     MerchantProductFilterForm,
+    MerchantSupportTicketFilterForm,
+    MerchantSupportTicketReplyForm,
     ProductForm,
+    SupportTicketCreateForm,
+    SupportTicketReplyForm,
 )
 from .models import (
     CardCode,
@@ -34,6 +38,8 @@ from .models import (
     ProductCategory,
     SensitiveOperationLog,
     SiteAnnouncement,
+    SupportTicket,
+    SupportTicketMessage,
 )
 from .security import build_guest_order_access_token, load_guest_order_access_token, mask_secret
 from .services.order_flow import create_single_item_order, mark_order_paid
@@ -107,6 +113,56 @@ def send_delivery_reminder_email(order, request=None):
         fail_silently=False,
     )
     return recipient
+
+
+def ticket_detail_url(ticket, request=None):
+    path = reverse("shop:support_ticket_detail", args=[ticket.ticket_no])
+    if settings.SITE_BASE_URL:
+        return f"{settings.SITE_BASE_URL}{path}"
+    if request is not None:
+        return request.build_absolute_uri(path)
+    return path
+
+
+def send_support_ticket_notification(ticket, body, request=None):
+    if not ticket.contact_email:
+        return
+    lines = [
+        f"工单号：{ticket.ticket_no}",
+        f"标题：{ticket.subject}",
+        f"当前状态：{ticket.get_status_display()}",
+        "",
+        body,
+        "",
+        f"查看工单：{ticket_detail_url(ticket, request=request)}",
+        settings.SITE_NAME,
+    ]
+    send_mail(
+        subject=f"{settings.SITE_NAME} 工单更新 - {ticket.ticket_no}",
+        message="\n".join(lines),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[ticket.contact_email],
+        fail_silently=True,
+    )
+
+
+def append_support_message(ticket, *, sender=None, sender_role, body, status, assignee=None):
+    normalized_body = (body or "").strip()
+    if not normalized_body:
+        return None
+    message = SupportTicketMessage.objects.create(
+        ticket=ticket,
+        sender=sender,
+        sender_role=sender_role,
+        body=normalized_body,
+    )
+    ticket.status = status
+    ticket.last_message_at = timezone.now()
+    ticket.closed_at = timezone.now() if status == SupportTicket.Status.CLOSED else None
+    if assignee is not None:
+        ticket.merchant_assignee = assignee
+    ticket.save(update_fields=["status", "last_message_at", "closed_at", "merchant_assignee", "updated_at"])
+    return message
 
 
 class MerchantRequiredMixin(UserPassesTestMixin):
@@ -333,6 +389,87 @@ class GuestOrderLookupView(FormView):
 class SupportView(TemplateView):
     template_name = "shop/support.html"
 
+    def get_form(self):
+        if self.request.user.is_authenticated:
+            return SupportTicketCreateForm(user=self.request.user)
+        return None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["ticket_form"] = kwargs.get("ticket_form") or self.get_form()
+        context["recent_tickets"] = []
+        if self.request.user.is_authenticated:
+            context["recent_tickets"] = (
+                self.request.user.support_tickets.select_related("order")
+                .prefetch_related("messages")
+                .order_by("-last_message_at")[:8]
+            )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f"{reverse('accounts:login')}?next={request.path}")
+
+        form = SupportTicketCreateForm(request.POST, user=request.user)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(ticket_form=form))
+
+        ticket = SupportTicket.objects.create(
+            user=request.user,
+            order=form.cleaned_data["order"],
+            contact_email=form.cleaned_data["contact_email"],
+            category=form.cleaned_data["category"],
+            priority=form.cleaned_data["priority"],
+            subject=form.cleaned_data["subject"],
+            status=SupportTicket.Status.PENDING_SUPPORT,
+        )
+        append_support_message(
+            ticket,
+            sender=request.user,
+            sender_role=SupportTicketMessage.SenderRole.USER,
+            body=form.cleaned_data["body"],
+            status=SupportTicket.Status.PENDING_SUPPORT,
+        )
+        messages.success(request, f"工单 {ticket.ticket_no} 已提交，客服会尽快处理。")
+        return redirect("shop:support_ticket_detail", ticket_no=ticket.ticket_no)
+
+
+class SupportTicketDetailView(LoginRequiredMixin, DetailView):
+    template_name = "shop/support_ticket_detail.html"
+    context_object_name = "ticket"
+    slug_field = "ticket_no"
+    slug_url_kwarg = "ticket_no"
+
+    def get_queryset(self):
+        return (
+            SupportTicket.objects.select_related("order", "merchant_assignee")
+            .prefetch_related("messages__sender")
+            .filter(user=self.request.user)
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["reply_form"] = kwargs.get("reply_form") or SupportTicketReplyForm()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.status == SupportTicket.Status.CLOSED:
+            messages.error(request, "该工单已关闭，无法继续回复。")
+            return redirect("shop:support_ticket_detail", ticket_no=self.object.ticket_no)
+        form = SupportTicketReplyForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(reply_form=form))
+        append_support_message(
+            self.object,
+            sender=request.user,
+            sender_role=SupportTicketMessage.SenderRole.USER,
+            body=form.cleaned_data["body"],
+            status=SupportTicket.Status.PENDING_SUPPORT,
+        )
+        messages.success(request, "你的补充说明已提交给客服。")
+        return redirect("shop:support_ticket_detail", ticket_no=self.object.ticket_no)
+
 
 class AnnouncementDetailView(DetailView):
     template_name = "shop/announcement_detail.html"
@@ -418,6 +555,7 @@ class AccountCenterView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["orders"] = self.get_filtered_orders()
+        context["recent_support_tickets"] = self.request.user.support_tickets.order_by("-last_message_at")[:5]
         context["status_choices"] = Order.Status.choices
         context["payment_status_choices"] = Order.PaymentStatus.choices
         context["current_query"] = self.request.GET.get("q", "").strip()
@@ -455,9 +593,122 @@ class MerchantDashboardView(MerchantContextMixin, TemplateView):
                 "pending_order_count": orders.filter(status=Order.Status.PENDING_PAYMENT).count(),
                 "card_stock_count": CardCode.objects.filter(status=CardCode.Status.AVAILABLE).count(),
                 "low_stock_products": low_stock_products,
+                "pending_support_ticket_count": SupportTicket.objects.filter(status=SupportTicket.Status.PENDING_SUPPORT).count(),
             }
         )
         return context
+
+
+class MerchantSupportTicketListView(MerchantContextMixin, ListView):
+    template_name = "shop/merchant_support_tickets.html"
+    context_object_name = "tickets"
+    merchant_tab = "support"
+
+    def get_filter_form(self):
+        if not hasattr(self, "_filter_form"):
+            self._filter_form = MerchantSupportTicketFilterForm(self.request.GET or None)
+        return self._filter_form
+
+    def get_queryset(self):
+        queryset = (
+            SupportTicket.objects.select_related("user", "order", "merchant_assignee")
+            .prefetch_related("messages")
+            .order_by("-last_message_at")
+        )
+        form = self.get_filter_form()
+        if form.is_valid():
+            query = form.cleaned_data["query"]
+            status = form.cleaned_data["status"]
+            category = form.cleaned_data["category"]
+            priority = form.cleaned_data["priority"]
+            if query:
+                queryset = queryset.filter(
+                    Q(ticket_no__icontains=query)
+                    | Q(subject__icontains=query)
+                    | Q(contact_email__icontains=query)
+                    | Q(user__username__icontains=query)
+                    | Q(order__order_no__icontains=query)
+                )
+            if status:
+                queryset = queryset.filter(status=status)
+            if category:
+                queryset = queryset.filter(category=category)
+            if priority:
+                queryset = queryset.filter(priority=priority)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filter_form"] = self.get_filter_form()
+        tickets = SupportTicket.objects.all()
+        context["ticket_stats"] = {
+            "pending_support": tickets.filter(status=SupportTicket.Status.PENDING_SUPPORT).count(),
+            "pending_user": tickets.filter(status=SupportTicket.Status.PENDING_USER).count(),
+            "resolved": tickets.filter(status=SupportTicket.Status.RESOLVED).count(),
+            "closed": tickets.filter(status=SupportTicket.Status.CLOSED).count(),
+        }
+        return context
+
+
+class MerchantSupportTicketDetailView(MerchantContextMixin, DetailView):
+    template_name = "shop/merchant_support_ticket_detail.html"
+    context_object_name = "ticket"
+    slug_field = "ticket_no"
+    slug_url_kwarg = "ticket_no"
+    merchant_tab = "support"
+
+    def get_queryset(self):
+        return (
+            SupportTicket.objects.select_related("user", "order", "merchant_assignee")
+            .prefetch_related("messages__sender")
+            .all()
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("reply_form") or MerchantSupportTicketReplyForm(initial={"status": self.object.status})
+        context["reply_form"] = form
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = MerchantSupportTicketReplyForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(reply_form=form))
+
+        status = form.cleaned_data["status"]
+        body = form.cleaned_data["body"]
+        if body.strip():
+            append_support_message(
+                self.object,
+                sender=request.user,
+                sender_role=SupportTicketMessage.SenderRole.SUPPORT,
+                body=body,
+                status=status,
+                assignee=request.user,
+            )
+            send_support_ticket_notification(
+                self.object,
+                body=f"客服回复：\n{body.strip()}",
+                request=request,
+            )
+        else:
+            system_message = f"工单状态已更新为：{SupportTicket.Status(status).label}"
+            append_support_message(
+                self.object,
+                sender=request.user,
+                sender_role=SupportTicketMessage.SenderRole.SYSTEM,
+                body=system_message,
+                status=status,
+                assignee=request.user,
+            )
+            send_support_ticket_notification(
+                self.object,
+                body=system_message,
+                request=request,
+            )
+        messages.success(request, f"工单 {self.object.ticket_no} 已更新。")
+        return redirect("shop:merchant_support_ticket_detail", ticket_no=self.object.ticket_no)
 
 
 class MerchantProductListView(MerchantContextMixin, ListView):

@@ -12,6 +12,8 @@ from .models import (
     ProductCategory,
     SensitiveOperationLog,
     SiteAnnouncement,
+    SupportTicket,
+    SupportTicketMessage,
 )
 
 admin.site.site_header = "web_0.0.1 商城后台"
@@ -23,6 +25,12 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     readonly_fields = ("product", "product_title", "quantity", "unit_price", "line_total")
+
+
+class SupportTicketMessageInline(admin.TabularInline):
+    model = SupportTicketMessage
+    extra = 0
+    readonly_fields = ("sender", "sender_role", "body", "created_at")
 
 
 @admin.register(ProductCategory)
@@ -116,3 +124,18 @@ class SensitiveOperationLogAdmin(admin.ModelAdmin):
     list_display = ("action", "actor", "order", "ip_address", "created_at")
     list_filter = ("action",)
     search_fields = ("order__order_no", "actor__username", "note")
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    list_display = ("ticket_no", "subject", "user", "category", "priority", "status", "last_message_at")
+    list_filter = ("status", "category", "priority")
+    search_fields = ("ticket_no", "subject", "contact_email", "user__username", "order__order_no")
+    inlines = [SupportTicketMessageInline]
+
+
+@admin.register(SupportTicketMessage)
+class SupportTicketMessageAdmin(admin.ModelAdmin):
+    list_display = ("ticket", "sender", "sender_role", "created_at")
+    list_filter = ("sender_role",)
+    search_fields = ("ticket__ticket_no", "body", "sender__username")

@@ -12,6 +12,10 @@ def generate_order_no():
     return timezone.now().strftime("OD%Y%m%d%H%M%S") + get_random_string(4).upper()
 
 
+def generate_support_ticket_no():
+    return timezone.now().strftime("CS%Y%m%d%H%M%S") + get_random_string(4).upper()
+
+
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("更新时间", auto_now=True)
@@ -350,3 +354,83 @@ class SensitiveOperationLog(TimeStampedModel):
 
     def __str__(self):
         return f"{self.action} - {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
+class SupportTicket(TimeStampedModel):
+    class Category(models.TextChoices):
+        ORDER = "order", "订单问题"
+        DELIVERY = "delivery", "发货问题"
+        PAYMENT = "payment", "支付问题"
+        ACCOUNT = "account", "账号问题"
+        API = "api", "接口问题"
+        AFTERSALE = "aftersale", "售后处理"
+        OTHER = "other", "其他"
+
+    class Status(models.TextChoices):
+        PENDING_SUPPORT = "pending_support", "待客服处理"
+        PENDING_USER = "pending_user", "待用户回复"
+        RESOLVED = "resolved", "已解决"
+        CLOSED = "closed", "已关闭"
+
+    class Priority(models.TextChoices):
+        LOW = "low", "低"
+        NORMAL = "normal", "普通"
+        HIGH = "high", "高"
+
+    ticket_no = models.CharField("工单号", max_length=32, unique=True, default=generate_support_ticket_no)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="support_tickets",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    order = models.ForeignKey("Order", related_name="support_tickets", on_delete=models.SET_NULL, null=True, blank=True)
+    contact_email = models.EmailField("联系邮箱")
+    category = models.CharField("工单分类", max_length=20, choices=Category.choices, default=Category.ORDER)
+    priority = models.CharField("优先级", max_length=20, choices=Priority.choices, default=Priority.NORMAL)
+    subject = models.CharField("工单标题", max_length=160)
+    status = models.CharField("工单状态", max_length=20, choices=Status.choices, default=Status.PENDING_SUPPORT)
+    merchant_assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="assigned_support_tickets",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    last_message_at = models.DateTimeField("最后消息时间", default=timezone.now)
+    closed_at = models.DateTimeField("关闭时间", null=True, blank=True)
+
+    class Meta:
+        ordering = ("-last_message_at", "-created_at")
+        verbose_name = "客服工单"
+        verbose_name_plural = "客服工单"
+
+    def __str__(self):
+        return self.ticket_no
+
+
+class SupportTicketMessage(TimeStampedModel):
+    class SenderRole(models.TextChoices):
+        USER = "user", "用户"
+        SUPPORT = "support", "客服"
+        SYSTEM = "system", "系统"
+
+    ticket = models.ForeignKey(SupportTicket, related_name="messages", on_delete=models.CASCADE)
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="support_ticket_messages",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    sender_role = models.CharField("发送方角色", max_length=20, choices=SenderRole.choices)
+    body = models.TextField("消息内容")
+
+    class Meta:
+        ordering = ("created_at",)
+        verbose_name = "工单消息"
+        verbose_name_plural = "工单消息"
+
+    def __str__(self):
+        return f"{self.ticket.ticket_no} - {self.sender_role}"

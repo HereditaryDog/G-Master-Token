@@ -18,6 +18,8 @@ from .views import (
     MerchantProductCreateView,
     DeliveryRecordRevealView,
     MerchantProductListView,
+    MerchantSupportTicketDetailView,
+    MerchantSupportTicketListView,
     MerchantProductToggleStatusView,
     MerchantProductUpdateView,
     MockPaymentView,
@@ -29,6 +31,7 @@ from .views import (
     StartPaymentView,
     StorefrontView,
     SupportView,
+    SupportTicketDetailView,
     StripeWebhookView,
 )
 
@@ -40,6 +43,7 @@ urlpatterns = [
     path("help/<slug:slug>/", HelpArticleDetailView.as_view(), name="help_article_detail"),
     path("order-lookup/", GuestOrderLookupView.as_view(), name="order_lookup"),
     path("support/", SupportView.as_view(), name="support"),
+    path("support/tickets/<slug:ticket_no>/", SupportTicketDetailView.as_view(), name="support_ticket_detail"),
     path("dashboard/", MerchantDashboardView.as_view(), name="merchant_dashboard"),
     path("dashboard/products/", MerchantProductListView.as_view(), name="merchant_products"),
     path("dashboard/products/new/", MerchantProductCreateView.as_view(), name="merchant_product_create"),
@@ -50,6 +54,8 @@ urlpatterns = [
     path("dashboard/orders/", MerchantOrderListView.as_view(), name="merchant_orders"),
     path("dashboard/orders/<slug:order_no>/actions/", MerchantOrderActionView.as_view(), name="merchant_order_action"),
     path("dashboard/orders/<slug:order_no>/", MerchantOrderDetailView.as_view(), name="merchant_order_detail"),
+    path("dashboard/support/", MerchantSupportTicketListView.as_view(), name="merchant_support_tickets"),
+    path("dashboard/support/<slug:ticket_no>/", MerchantSupportTicketDetailView.as_view(), name="merchant_support_ticket_detail"),
     path("me/", AccountCenterView.as_view(), name="account_center"),
     path("products/<slug:slug>/", ProductDetailView.as_view(), name="product_detail"),
     path("products/<slug:slug>/buy/", CreateOrderView.as_view(), name="create_order"),
