@@ -40,6 +40,35 @@ class Command(BaseCommand):
                 "delivery_method": Product.DeliveryMethod.STOCK_CARD,
                 "badge": "热卖",
                 "cover_url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
+                "low_stock_threshold": 4,
+            },
+            {
+                "category": ProductCategory.objects.get(slug="developer-gift-cards"),
+                "title": "Open Token 10 美元点卡",
+                "slug": "open-token-10usd",
+                "summary": "适合常规开发调试和小团队日常补货。",
+                "description": "适用于周期性开发调用和产品联调，付款后自动发货。",
+                "face_value": "10.00",
+                "token_amount": 1100000,
+                "price": "75.00",
+                "delivery_method": Product.DeliveryMethod.STOCK_CARD,
+                "badge": "常用",
+                "cover_url": "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80",
+                "low_stock_threshold": 5,
+            },
+            {
+                "category": ProductCategory.objects.get(slug="developer-gift-cards"),
+                "title": "开发测试周包",
+                "slug": "developer-week-pack",
+                "summary": "适合短周期冲刺、测试周和脚本批量运行。",
+                "description": "面向开发测试场景的库存型套餐，适合短期集中调用。",
+                "face_value": "15.00",
+                "token_amount": 1600000,
+                "price": "108.00",
+                "delivery_method": Product.DeliveryMethod.STOCK_CARD,
+                "badge": "测试推荐",
+                "cover_url": "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1200&q=80",
+                "low_stock_threshold": 3,
             },
             {
                 "category": ProductCategory.objects.get(slug="openai-token-topup"),
@@ -54,6 +83,37 @@ class Command(BaseCommand):
                 "provider_sku": "api-token-20usd",
                 "badge": "API 自动发货",
                 "cover_url": "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=1200&q=80",
+                "low_stock_threshold": 0,
+            },
+            {
+                "category": ProductCategory.objects.get(slug="openai-token-topup"),
+                "title": "Open Token 50 美元点卡",
+                "slug": "open-token-50usd",
+                "summary": "适合持续调用和更稳定的生产环境补货。",
+                "description": "由合作 API 平台自动供货，适合高频业务和多项目共用。",
+                "face_value": "50.00",
+                "token_amount": 5800000,
+                "price": "345.00",
+                "delivery_method": Product.DeliveryMethod.PARTNER_API,
+                "provider_sku": "api-token-50usd",
+                "badge": "高频补货",
+                "cover_url": "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=1200&q=80",
+                "low_stock_threshold": 0,
+            },
+            {
+                "category": ProductCategory.objects.get(slug="openai-token-topup"),
+                "title": "企业 API 补货包 100 美元",
+                "slug": "enterprise-api-pack-100usd",
+                "summary": "适合企业项目、内部工具和多人协作的长期补货方案。",
+                "description": "提供更高额度的自动化供货能力，适合稳定业务长期使用。",
+                "face_value": "100.00",
+                "token_amount": 12000000,
+                "price": "668.00",
+                "delivery_method": Product.DeliveryMethod.PARTNER_API,
+                "provider_sku": "api-token-100usd",
+                "badge": "企业方案",
+                "cover_url": "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80",
+                "low_stock_threshold": 0,
             },
         ]
 
@@ -126,12 +186,23 @@ class Command(BaseCommand):
             action = "创建" if created else "更新"
             self.stdout.write(self.style.SUCCESS(f"{action}文章: {article.title}"))
 
-        product = Product.objects.get(slug="open-token-5usd")
-        for index in range(1, 9):
-            CardCode.objects.get_or_create(
-                product=product,
-                code=f"DEMO-TOKEN-5USD-{index:04d}",
-                defaults={"note": "演示库存"},
-            )
+        stock_samples = {
+            "open-token-5usd": 8,
+            "open-token-10usd": 12,
+            "developer-week-pack": 6,
+        }
+        for slug, quantity in stock_samples.items():
+            product = Product.objects.get(slug=slug)
+            prefix = slug.replace("-", "_").upper()
+            for index in range(1, quantity + 1):
+                plain_code = f"DEMO-{prefix}-{index:04d}"
+                code_hash = CardCode.build_code_hash(plain_code)
+                card = CardCode.objects.filter(code_hash=code_hash).first()
+                if not card:
+                    CardCode.objects.create(
+                        product=product,
+                        code=plain_code,
+                        note="演示库存",
+                    )
 
         self.stdout.write(self.style.SUCCESS("演示数据已准备完成。"))

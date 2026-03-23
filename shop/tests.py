@@ -3,7 +3,17 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import User
-from shop.models import CardCode, DeliveryRecord, HelpArticle, InventoryImportBatch, Order, Product, ProductCategory, SiteAnnouncement
+from shop.models import (
+    CardCode,
+    DeliveryRecord,
+    HelpArticle,
+    InventoryImportBatch,
+    Order,
+    Product,
+    ProductCategory,
+    SensitiveOperationLog,
+    SiteAnnouncement,
+)
 from shop.services.order_flow import create_single_item_order, mark_order_paid
 from shop.services.payment import get_default_gateway_code, list_active_payment_gateways, list_reserved_payment_gateways
 
@@ -36,6 +46,18 @@ class StoreOrderFlowTests(TestCase):
             token_amount=1000000,
             price="68.00",
             delivery_method=Product.DeliveryMethod.STOCK_CARD,
+            is_active=True,
+        )
+        self.related_product = Product.objects.create(
+            category=self.category,
+            title="Test Token Card Pro",
+            slug="test-token-card-pro",
+            summary="测试商品进阶版",
+            description="测试商品进阶版详情",
+            face_value="20.00",
+            token_amount=2000000,
+            price="118.00",
+            delivery_method=Product.DeliveryMethod.PARTNER_API,
             is_active=True,
         )
         CardCode.objects.create(product=self.product, code="CODE-0001")
@@ -81,6 +103,43 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, order.order_no)
 
+    def test_guest_order_lookup_masks_delivery_codes_in_initial_html(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        client.post(reverse("shop:create_order", args=[self.product.slug]), {"quantity": 1})
+        order = Order.objects.get(user=self.buyer)
+        client.post(reverse("shop:start_payment", args=[order.order_no]))
+        client.post(reverse("shop:mock_pay", args=[order.order_no]))
+        client.logout()
+        response = client.post(
+            reverse("shop:order_lookup"),
+            {"order_no": order.order_no, "email": self.buyer.email},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "CODE-0001")
+        self.assertContains(response, "CODE...0001")
+
+    def test_guest_delivery_reveal_requires_matching_email_token(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        client.post(reverse("shop:create_order", args=[self.product.slug]), {"quantity": 1})
+        order = Order.objects.get(user=self.buyer)
+        client.post(reverse("shop:start_payment", args=[order.order_no]))
+        client.post(reverse("shop:mock_pay", args=[order.order_no]))
+        client.logout()
+        lookup_response = client.post(
+            reverse("shop:order_lookup"),
+            {"order_no": order.order_no, "email": self.buyer.email},
+        )
+        self.assertEqual(lookup_response.status_code, 200)
+        guest_token = lookup_response.context["guest_access_token"]
+        delivery = DeliveryRecord.objects.get(order_item__order=order)
+        invalid_response = client.post(
+            reverse("shop:delivery_reveal", args=[order.order_no, delivery.id]),
+            {"access_token": guest_token[:-1] + ("A" if guest_token[-1] != "A" else "B")},
+        )
+        self.assertEqual(invalid_response.status_code, 403)
+
     def test_help_center_and_article_detail_render(self):
         client = Client()
         list_response = client.get(reverse("shop:help_center"))
@@ -89,6 +148,14 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(list_response, "测试教程")
         self.assertContains(detail_response, "教程正文")
+
+    def test_product_detail_renders_related_product_and_purchase_copy(self):
+        client = Client()
+        response = client.get(reverse("shop:product_detail", args=[self.product.slug]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "商品说明")
+        self.assertContains(response, "同类商品推荐")
+        self.assertContains(response, self.related_product.title)
 
     def test_support_page_renders(self):
         client = Client()
@@ -211,7 +278,7 @@ class MerchantOperationsTests(TestCase):
 
     def test_merchant_can_resend_delivery_email(self):
         self.client.force_login(self.owner)
-        delivered_code = DeliveryRecord.objects.get(order_item__order=self.completed_order).display_code
+        delivered_code = DeliveryRecord.objects.get(order_item__order=self.completed_order).reveal_display_code()
         response = self.client.post(
             reverse("shop:merchant_order_action", args=[self.completed_order.order_no]),
             {"action": "resend_delivery"},
@@ -219,7 +286,15 @@ class MerchantOperationsTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(self.completed_order.order_no, mail.outbox[0].body)
-        self.assertIn(delivered_code, mail.outbox[0].body)
+        self.assertNotIn(delivered_code, mail.outbox[0].body)
+        self.assertIn("不会通过邮件直接重发完整发货内容", mail.outbox[0].body)
+        self.assertIn("http://testserver/order-lookup/", mail.outbox[0].body)
+        self.assertTrue(
+            SensitiveOperationLog.objects.filter(
+                action=SensitiveOperationLog.Action.SEND_DELIVERY_REMINDER,
+                order=self.completed_order,
+            ).exists()
+        )
 
     def test_product_filters_and_toggle_status(self):
         self.client.force_login(self.owner)
@@ -242,6 +317,13 @@ class MerchantOperationsTests(TestCase):
         self.assertEqual(toggle_response.status_code, 302)
         inactive_product.refresh_from_db()
         self.assertTrue(inactive_product.is_active)
+
+    def test_card_codes_are_encrypted_at_rest(self):
+        card = CardCode.objects.create(product=self.product, code="SECRET-CODE-1234", note="安全测试")
+        card.refresh_from_db()
+        self.assertNotEqual(card.code, "SECRET-CODE-1234")
+        self.assertTrue(card.code.startswith("gAAAAA"))
+        self.assertEqual(card.reveal_code(), "SECRET-CODE-1234")
 
     def test_inventory_preview_and_import_history(self):
         self.client.force_login(self.owner)
@@ -267,11 +349,44 @@ class MerchantOperationsTests(TestCase):
             },
         )
         self.assertEqual(import_response.status_code, 302)
-        self.assertTrue(CardCode.objects.filter(code="NEW-CODE-1").exists())
-        self.assertTrue(CardCode.objects.filter(code="NEW-CODE-2").exists())
+        self.assertTrue(CardCode.objects.filter(code_hash=CardCode.build_code_hash("NEW-CODE-1")).exists())
+        self.assertTrue(CardCode.objects.filter(code_hash=CardCode.build_code_hash("NEW-CODE-2")).exists())
         batch = InventoryImportBatch.objects.latest("created_at")
         self.assertEqual(batch.imported_count, 2)
         self.assertEqual(batch.duplicate_count, 2)
+
+    def test_inventory_page_masks_plaintext_codes(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("shop:merchant_inventory"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "OPS-CODE-0001")
+        self.assertContains(response, "OPS-...0001")
+
+    def test_inventory_code_reveal_returns_plaintext_and_logs(self):
+        self.client.force_login(self.owner)
+        card = CardCode.objects.get(code_hash=CardCode.build_code_hash("OPS-CODE-0001"))
+        response = self.client.post(reverse("shop:merchant_inventory_code_reveal", args=[card.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["code"], "OPS-CODE-0001")
+        self.assertTrue(
+            SensitiveOperationLog.objects.filter(
+                action=SensitiveOperationLog.Action.REVEAL_CARD_CODE,
+                card_code=card,
+            ).exists()
+        )
+
+    def test_delivery_reveal_returns_plaintext_and_logs_for_merchant(self):
+        self.client.force_login(self.owner)
+        delivery = DeliveryRecord.objects.get(order_item__order=self.completed_order)
+        response = self.client.post(reverse("shop:delivery_reveal", args=[self.completed_order.order_no, delivery.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["code"], delivery.reveal_display_code())
+        self.assertTrue(
+            SensitiveOperationLog.objects.filter(
+                action=SensitiveOperationLog.Action.REVEAL_DELIVERY_CODE,
+                delivery_record=delivery,
+            ).exists()
+        )
 
 
 class AccountCenterEnhancementTests(TestCase):
@@ -314,3 +429,36 @@ class AccountCenterEnhancementTests(TestCase):
         response = self.client.post(reverse("shop:reorder", args=[self.completed_order.order_no]))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Order.objects.filter(user=self.user).count(), 3)
+
+    def test_order_detail_masks_delivery_codes_in_initial_html(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("shop:order_detail", args=[self.completed_order.order_no]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "REPEAT-CODE-001")
+
+    def test_order_delivery_reveal_requires_owner_or_merchant(self):
+        other = User.objects.create_user(username="other", password="Other123!", email="other@example.com")
+        delivery = DeliveryRecord.objects.get(order_item__order=self.completed_order)
+        self.client.force_login(other)
+        response = self.client.post(reverse("shop:delivery_reveal", args=[self.completed_order.order_no, delivery.id]))
+        self.assertEqual(response.status_code, 403)
+
+
+class SecurityMiddlewareTests(TestCase):
+    @override_settings(ADMIN_ALLOWED_IPS=["10.0.0.1"])
+    def test_admin_ip_allowlist_blocks_non_allowed_ip(self):
+        response = self.client.get("/admin/", REMOTE_ADDR="127.0.0.1")
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(MERCHANT_ALLOWED_IPS=["10.0.0.1"])
+    def test_merchant_ip_allowlist_blocks_non_allowed_ip(self):
+        owner = User.objects.create_user(
+            username="owner-sec",
+            password="ChangeMe123!",
+            email="owner-sec@example.com",
+            is_staff=True,
+            is_merchant=True,
+        )
+        self.client.force_login(owner)
+        response = self.client.get(reverse("shop:merchant_dashboard"), REMOTE_ADDR="127.0.0.1")
+        self.assertEqual(response.status_code, 403)

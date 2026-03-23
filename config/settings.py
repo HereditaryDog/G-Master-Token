@@ -20,9 +20,12 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()
 ]
+ADMIN_ALLOWED_IPS = [ip.strip() for ip in os.getenv("ADMIN_ALLOWED_IPS", "").split(",") if ip.strip()]
+MERCHANT_ALLOWED_IPS = [ip.strip() for ip in os.getenv("MERCHANT_ALLOWED_IPS", "").split(",") if ip.strip()]
 
 SITE_NAME = os.getenv("SITE_NAME", "web_0.0.1")
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "").strip().rstrip("/")
+CARD_SECRET_KEY = os.getenv("CARD_SECRET_KEY", "").strip()
 PROJECT_VERSION = os.getenv("PROJECT_VERSION", VERSION)
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
@@ -77,6 +80,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'shop.middleware.SensitiveAreaIPAllowlistMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

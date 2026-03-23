@@ -1,6 +1,6 @@
 # web_0.0.1
 
-当前版本：`0.0.5`
+当前版本：`0.0.6`
 
 一个面向数字点卡与 Token 充值场景的 Django 商城项目，包含前台商城、订单系统、用户认证、商家后台、帮助中心、支付抽象层和供货接口抽象层。
 
@@ -98,12 +98,17 @@ python manage.py runserver
 DJANGO_SECRET_KEY=replace-me
 DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
+ADMIN_ALLOWED_IPS=
+MERCHANT_ALLOWED_IPS=
 SITE_NAME=web_0.0.1
 SITE_BASE_URL=
+CARD_SECRET_KEY=
 ```
 
 `SITE_BASE_URL` 用于密码重置邮件、通知邮件等需要生成外部可访问链接的场景。
 本地开发不填也可以；如果要让手机或外部设备打开邮件里的链接，需要配置成你的局域网地址或正式域名，例如 `http://192.168.1.8:8010` 或 `https://example.com`。
+`CARD_SECRET_KEY` 用于卡密库存和发货内容的应用层加密。生产环境强烈建议单独配置，并与 Django `SECRET_KEY` 分开保管。
+`ADMIN_ALLOWED_IPS` 和 `MERCHANT_ALLOWED_IPS` 用于给 `/admin/` 和 `/dashboard/` 做额外 IP 白名单限制；生产环境建议至少限制后台入口来源。
 
 ### 邮件
 
@@ -190,6 +195,13 @@ DJANGO_SECURE_HSTS_PRELOAD=true
 ## 更新日志
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)
+
+### 0.0.6
+
+- 新增卡密与发货内容应用层加密、敏感操作审计日志、后台可选 IP 白名单
+- 商家库存页、订单页、访客查单页改为默认掩码显示，按需查看
+- 商家邮件重发调整为发送查看提醒，降低邮件链路泄露风险
+- 首页商品区和商品详情页进一步优化，补充更多演示商品
 
 ### 0.0.5
 

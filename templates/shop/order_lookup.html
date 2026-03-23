@@ -35,7 +35,17 @@
                 <div class="delivery-block">
                     <strong>{{ item.product_title }} x {{ item.quantity }}</strong>
                     {% for delivery in item.deliveries.all %}
-                        <div class="delivery-code">{{ delivery.display_code }}</div>
+                        <div class="copy-row">
+                            <div class="delivery-code js-sensitive-output">{{ delivery.masked_display_code }}</div>
+                            <button
+                                type="button"
+                                class="ghost-button js-delivery-reveal"
+                                data-url="{% url 'shop:delivery_reveal' order.order_no delivery.id %}"
+                                data-access-token="{{ guest_access_token }}"
+                            >
+                                查看并复制
+                            </button>
+                        </div>
                     {% empty %}
                         <p class="muted">当前还没有发货内容，通常是在支付完成后生成。</p>
                     {% endfor %}
@@ -44,4 +54,35 @@
         </div>
     {% endif %}
 </section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".js-delivery-reveal").forEach(function (button) {
+        button.addEventListener("click", async function () {
+            const response = await fetch(button.dataset.url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": document.querySelector("input[name='csrfmiddlewaretoken']").value,
+                },
+                body: new URLSearchParams({ access_token: button.dataset.accessToken || "" }),
+            });
+            const data = await response.json();
+            if (!data.ok) {
+                return;
+            }
+            const output = button.parentElement.querySelector(".js-sensitive-output");
+            if (output) {
+                output.textContent = data.code;
+            }
+            await navigator.clipboard.writeText(data.code);
+            const originalText = button.textContent;
+            button.textContent = "已复制";
+            window.setTimeout(function () {
+                button.textContent = originalText;
+            }, 1400);
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -3,40 +3,139 @@
 {% block title %}{{ product.title }} | {{ site_name }}{% endblock %}
 
 {% block content %}
-<section class="detail-layout">
-    <div class="detail-visual" style="background-image: linear-gradient(135deg, rgba(6,23,18,.84), rgba(6,23,18,.28)), url('{{ product.cover_url }}');">
-        {% if product.badge %}
-            <span class="pill">{{ product.badge }}</span>
-        {% endif %}
-        <div class="detail-copy">
-            <p class="eyebrow">{{ product.inventory_label }}</p>
-            <h1>{{ product.title }}</h1>
-            <p class="lead">{{ product.summary }}</p>
-        </div>
-    </div>
-    <div class="detail-panel">
-        <div class="price-box">
-            <strong>HK${{ product.price }}</strong>
-            <span>面值 HK${{ product.face_value }} / {{ product.token_amount }} tokens</span>
-        </div>
-        <p class="muted">{{ product.description }}</p>
-        {% if request.user.is_authenticated %}
-            <form method="post" action="{% url 'shop:create_order' product.slug %}" class="form-grid compact">
-                {% csrf_token %}
-                {% for field in form %}
-                    <label class="field">
-                        <span>{{ field.label }}</span>
-                        {{ field }}
-                    </label>
-                {% endfor %}
-                <button type="submit" class="primary-button">立即下单</button>
-            </form>
-        {% else %}
-            <div class="notice-card">
-                <p>下单前需要先登录账号。</p>
-                <a class="primary-button" href="{% url 'accounts:login' %}?next={{ request.path }}">先登录再购买</a>
+<section class="product-detail-shell">
+    <section class="detail-layout">
+        <div class="detail-visual detail-visual--product" style="background-image: linear-gradient(180deg, rgba(8,18,32,.16), rgba(8,18,32,.62)), url('{{ product.cover_url }}');">
+            <div class="detail-copy">
+                <div class="detail-copy__badges">
+                    {% if product.badge %}
+                        <span class="pill">{{ product.badge }}</span>
+                    {% endif %}
+                    {% if product.category %}
+                        <span class="detail-chip">{{ product.category.name }}</span>
+                    {% endif %}
+                </div>
+                <p class="eyebrow">{{ product.inventory_label }}</p>
+                <h1>{{ product.title }}</h1>
+                <p class="lead">{{ product.summary }}</p>
+                <div class="detail-facts">
+                    <div class="detail-fact">
+                        <span>面值</span>
+                        <strong>HK${{ product.face_value }}</strong>
+                    </div>
+                    <div class="detail-fact">
+                        <span>售价</span>
+                        <strong>HK${{ product.price }}</strong>
+                    </div>
+                    <div class="detail-fact">
+                        <span>Token</span>
+                        <strong>{{ product.token_amount }}</strong>
+                    </div>
+                </div>
             </div>
-        {% endif %}
-    </div>
+        </div>
+        <div class="detail-panel detail-panel--product">
+            <div class="price-box price-box--detail">
+                <span class="eyebrow">Order Summary</span>
+                <strong>HK${{ product.price }}</strong>
+                <p class="muted">面值 HK${{ product.face_value }} / {{ product.token_amount }} tokens</p>
+                <div class="detail-chip-row">
+                    <span class="detail-chip">{{ product.get_delivery_method_display }}</span>
+                    <span class="detail-chip">{{ product.inventory_label }}</span>
+                </div>
+            </div>
+
+            <div class="detail-description">
+                <h3>商品说明</h3>
+                <p class="muted">{{ product.description }}</p>
+            </div>
+
+            <div class="detail-support-grid">
+                <div class="detail-support-card">
+                    <strong>发货方式</strong>
+                    <p class="muted">
+                        {% if product.delivery_method == "stock_card" %}
+                            支付成功后自动发出库存卡密，适合快速交付和即时使用。
+                        {% else %}
+                            通过合作 API 自动供货，适合长期调用和高频补货。
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="detail-support-card">
+                    <strong>订单支持</strong>
+                    <p class="muted">支持订单号与邮箱查单，支付成功后可在账号中心或订单详情页查看发货内容。</p>
+                </div>
+            </div>
+
+            {% if request.user.is_authenticated %}
+                <form method="post" action="{% url 'shop:create_order' product.slug %}" class="form-grid compact">
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <label class="field">
+                            <span>{{ field.label }}</span>
+                            {{ field }}
+                        </label>
+                    {% endfor %}
+                    <button type="submit" class="primary-button">立即下单</button>
+                </form>
+            {% else %}
+                <div class="notice-card">
+                    <p>下单前需要先登录账号。</p>
+                    <a class="primary-button" href="{% url 'accounts:login' %}?next={{ request.path }}">先登录再购买</a>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if related_products %}
+        <section class="product-section">
+            <div class="section-intro section-intro--left">
+                <p class="eyebrow">Related</p>
+                <h2>同类商品推荐</h2>
+                <p class="muted product-section__lead">如果你在比较面值和供货方式，可以顺手看一下这些相近选择。</p>
+            </div>
+            <div class="product-grid product-grid--apple">
+                {% for related in related_products %}
+                    <article class="product-card product-card--apple product-card--compact">
+                        <div class="product-card__visual product-card__visual--compact" style="background-image: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0)), url('{{ related.cover_url }}');">
+                            {% if related.badge %}
+                                <span class="pill">{{ related.badge }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="product-card__body">
+                            <div class="product-card__meta product-card__meta--stacked">
+                                {% if related.category %}
+                                    <span class="eyebrow">{{ related.category.name }}</span>
+                                {% endif %}
+                                <h3>{{ related.title }}</h3>
+                                <div class="product-card__subline">
+                                    <span class="muted">{{ related.inventory_label }}</span>
+                                    <span class="product-card__delivery">{{ related.get_delivery_method_display }}</span>
+                                </div>
+                            </div>
+                            <p class="product-card__summary">{{ related.summary }}</p>
+                            <dl class="product-specs">
+                                <div>
+                                    <dt>售价</dt>
+                                    <dd>HK${{ related.price }}</dd>
+                                </div>
+                                <div>
+                                    <dt>面值</dt>
+                                    <dd>HK${{ related.face_value }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Token</dt>
+                                    <dd>{{ related.token_amount }}</dd>
+                                </div>
+                            </dl>
+                            <div class="product-card__footer">
+                                <a class="ghost-button full-width" href="{% url 'shop:product_detail' related.slug %}">查看详情</a>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
 </section>
 {% endblock %}

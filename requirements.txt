@@ -5,3 +5,4 @@ python-dotenv==1.2.2
 Pillow==12.1.1
 psycopg[binary]==3.3.3
 waitress==3.0.2
+cryptography==46.0.5

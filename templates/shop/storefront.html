@@ -102,7 +102,7 @@
         <div class="section-intro">
             <p class="eyebrow">Products</p>
             <h2>{% if current_category %}分类商品{% else %}全部在售商品{% endif %}</h2>
-            <p class="muted">像苹果官网一样，更干净地陈列商品内容，把注意力放回到商品本身。</p>
+            <p class="muted product-section__lead">用更聚焦的陈列方式展示商品，帮助你更快比较面值、售价、库存和供货方式。</p>
         </div>
         <div class="product-grid product-grid--apple">
             {% for product in products %}
@@ -118,9 +118,12 @@
                                 <span class="eyebrow">{{ product.category.name }}</span>
                             {% endif %}
                             <h3>{{ product.title }}</h3>
-                            <span class="muted">{{ product.inventory_label }}</span>
+                            <div class="product-card__subline">
+                                <span class="muted">{{ product.inventory_label }}</span>
+                                <span class="product-card__delivery">{{ product.get_delivery_method_display }}</span>
+                            </div>
                         </div>
-                        <p>{{ product.summary }}</p>
+                        <p class="product-card__summary">{{ product.summary }}</p>
                         <dl class="product-specs product-specs--apple">
                             <div>
                                 <dt>面值</dt>
@@ -135,7 +138,9 @@
                                 <dd>{{ product.token_amount }}</dd>
                             </div>
                         </dl>
-                        <a class="primary-button full-width" href="{% url 'shop:product_detail' product.slug %}">查看详情</a>
+                        <div class="product-card__footer">
+                            <a class="primary-button full-width" href="{% url 'shop:product_detail' product.slug %}">查看详情</a>
+                        </div>
                     </div>
                 </article>
             {% empty %}

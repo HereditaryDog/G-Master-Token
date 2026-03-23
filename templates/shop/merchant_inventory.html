@@ -100,7 +100,19 @@
                             {% for code in card_codes %}
                                 <tr>
                                     <td>{{ code.product.title }}</td>
-                                    <td>{{ code.code }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <span class="mono-mask js-sensitive-output">{{ code.masked_code }}</span>
+                                            <button
+                                                type="button"
+                                                class="ghost-button js-secure-reveal"
+                                                data-url="{% url 'shop:merchant_inventory_code_reveal' code.id %}"
+                                                data-target="closest"
+                                            >
+                                                查看
+                                            </button>
+                                        </div>
+                                    </td>
                                     <td>{{ code.get_status_display }}</td>
                                     <td>{{ code.note|default:"-" }}</td>
                                 </tr>
@@ -157,4 +169,33 @@
         </section>
     </div>
 </section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".js-secure-reveal").forEach(function (button) {
+        button.addEventListener("click", async function () {
+            const response = await fetch(button.dataset.url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": document.querySelector("input[name='csrfmiddlewaretoken']").value,
+                },
+            });
+            const data = await response.json();
+            if (!data.ok) {
+                return;
+            }
+            const output = button.parentElement.querySelector(".js-sensitive-output");
+            if (output) {
+                output.textContent = data.code;
+            }
+            await navigator.clipboard.writeText(data.code);
+            const originalText = button.textContent;
+            button.textContent = "已复制";
+            window.setTimeout(function () {
+                button.textContent = originalText;
+            }, 1400);
+        });
+    });
+});
+</script>
 {% endblock %}

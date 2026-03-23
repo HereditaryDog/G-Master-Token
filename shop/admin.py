@@ -10,6 +10,7 @@ from .models import (
     PaymentAttempt,
     Product,
     ProductCategory,
+    SensitiveOperationLog,
     SiteAnnouncement,
 )
 
@@ -57,9 +58,14 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(CardCode)
 class CardCodeAdmin(admin.ModelAdmin):
-    list_display = ("product", "code", "status", "sold_at")
+    list_display = ("product", "masked_code_display", "status", "sold_at")
     list_filter = ("status", "product")
-    search_fields = ("code", "note")
+    search_fields = ("note", "product__title")
+
+    def masked_code_display(self, obj):
+        return obj.masked_code
+
+    masked_code_display.short_description = "卡密掩码"
 
 
 @admin.register(Order)
@@ -81,9 +87,14 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryRecord)
 class DeliveryRecordAdmin(admin.ModelAdmin):
-    list_display = ("order_item", "source", "display_code", "delivered_at")
+    list_display = ("order_item", "source", "masked_display_code", "delivered_at")
     list_filter = ("source",)
-    search_fields = ("display_code", "order_item__order__order_no")
+    search_fields = ("order_item__order__order_no",)
+
+    def masked_display_code(self, obj):
+        return obj.masked_display_code
+
+    masked_display_code.short_description = "交付内容掩码"
 
 
 @admin.register(PaymentAttempt)
@@ -98,3 +109,10 @@ class InventoryImportBatchAdmin(admin.ModelAdmin):
     list_display = ("product", "operator", "imported_count", "duplicate_count", "created_at")
     list_filter = ("product",)
     search_fields = ("product__title", "note", "duplicate_sample", "operator__username")
+
+
+@admin.register(SensitiveOperationLog)
+class SensitiveOperationLogAdmin(admin.ModelAdmin):
+    list_display = ("action", "actor", "order", "ip_address", "created_at")
+    list_filter = ("action",)
+    search_fields = ("order__order_no", "actor__username", "note")

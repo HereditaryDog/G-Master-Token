@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.conf import settings
+from django.core import signing
 from django.core.mail import send_mail
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Count, Q
@@ -24,14 +25,17 @@ from .forms import (
 )
 from .models import (
     CardCode,
+    DeliveryRecord,
     HelpArticle,
     InventoryImportBatch,
     Order,
     PaymentAttempt,
     Product,
     ProductCategory,
+    SensitiveOperationLog,
     SiteAnnouncement,
 )
+from .security import build_guest_order_access_token, load_guest_order_access_token, mask_secret
 from .services.order_flow import create_single_item_order, mark_order_paid
 from .services.payment import (
     create_checkout_session,
@@ -43,35 +47,66 @@ from .services.payment import (
 
 
 def collect_delivery_codes(order):
-    return [delivery.display_code for item in order.items.all() for delivery in item.deliveries.all()]
+    return [delivery.reveal_display_code() for item in order.items.all() for delivery in item.deliveries.all()]
 
 
-def send_delivery_codes_email(order):
-    delivery_codes = collect_delivery_codes(order)
+def get_client_ip(request):
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def log_sensitive_operation(request, action, *, order=None, card_code=None, delivery_record=None, note="", metadata=None):
+    SensitiveOperationLog.objects.create(
+        actor=request.user if request.user.is_authenticated else None,
+        action=action,
+        order=order,
+        card_code=card_code,
+        delivery_record=delivery_record,
+        ip_address=get_client_ip(request),
+        note=note,
+        metadata=metadata or {},
+    )
+
+
+def send_delivery_reminder_email(order, request=None):
     recipient = order.contact_email or order.user.email
     if not recipient:
         raise ValueError("当前订单没有可用的收件邮箱。")
-    if not delivery_codes:
+    if not collect_delivery_codes(order):
         raise ValueError("当前订单还没有可重发的发货内容。")
+
+    if settings.SITE_BASE_URL:
+        lookup_url = f"{settings.SITE_BASE_URL}/order-lookup/"
+        account_url = f"{settings.SITE_BASE_URL}/me/"
+    elif request is not None:
+        lookup_url = request.build_absolute_uri("/order-lookup/")
+        account_url = request.build_absolute_uri("/me/")
+    else:
+        lookup_url = "/order-lookup/"
+        account_url = "/me/"
 
     content_lines = [
         f"订单号：{order.order_no}",
         f"用户：{order.user.username}",
         "",
-        "以下是当前订单的发货内容：",
-        *delivery_codes,
+        "为了降低卡密在邮件链路中泄露的风险，本站不会通过邮件直接重发完整发货内容。",
+        "你可以使用以下方式重新查看：",
+        f"1. 登录后进入账号中心：{account_url}",
+        f"2. 或使用订单号 + 邮箱在查单页查看：{lookup_url}",
         "",
-        "如果你已收到，可忽略这封邮件。",
+        "如果这不是你的操作，可以忽略这封邮件。",
         settings.SITE_NAME,
     ]
     send_mail(
-        subject=f"{settings.SITE_NAME} 订单发货内容重发 - {order.order_no}",
+        subject=f"{settings.SITE_NAME} 订单查看提醒 - {order.order_no}",
         message="\n".join(content_lines),
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient],
         fail_silently=False,
     )
-    return recipient, len(delivery_codes)
+    return recipient
 
 
 class MerchantRequiredMixin(UserPassesTestMixin):
@@ -130,6 +165,10 @@ class ProductDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["form"] = AddToCartForm()
+        related_queryset = Product.objects.filter(is_active=True).exclude(pk=self.object.pk)
+        if self.object.category_id:
+            related_queryset = related_queryset.filter(category_id=self.object.category_id)
+        context["related_products"] = related_queryset.select_related("category")[:3]
         return context
 
 
@@ -271,6 +310,7 @@ class GuestOrderLookupView(FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["order"] = kwargs.get("order")
+        context["guest_access_token"] = kwargs.get("guest_access_token", "")
         return context
 
     def form_valid(self, form):
@@ -286,7 +326,8 @@ class GuestOrderLookupView(FormView):
         if not order:
             form.add_error(None, "没有找到匹配的订单，请检查订单号和邮箱。")
             return self.form_invalid(form)
-        return self.render_to_response(self.get_context_data(form=form, order=order))
+        access_token = build_guest_order_access_token(order, email)
+        return self.render_to_response(self.get_context_data(form=form, order=order, guest_access_token=access_token))
 
 
 class SupportView(TemplateView):
@@ -510,11 +551,13 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
         if not codes:
             form.add_error("codes", "没有可导入的新卡密，重复内容已在预览中列出。")
             return self.render_to_response(self.get_context_data(form=form))
-        CardCode.objects.bulk_create(
-            [CardCode(product=product, code=code, note=note) for code in codes],
-            batch_size=100,
-        )
-        duplicate_sample = "\n".join(preview["duplicate_samples"])
+        cards = []
+        for code in codes:
+            card = CardCode(product=product, note=note)
+            card.set_plaintext_code(code)
+            cards.append(card)
+        CardCode.objects.bulk_create(cards, batch_size=100)
+        duplicate_sample = "\n".join(mask_secret(code) for code in preview["duplicate_samples"])
         InventoryImportBatch.objects.create(
             product=product,
             operator=self.request.user,
@@ -545,6 +588,20 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
         context["import_preview"] = self.get_import_preview()
         context["import_history"] = InventoryImportBatch.objects.select_related("product", "operator")[:12]
         return context
+
+
+class MerchantInventoryCodeRevealView(MerchantRequiredMixin, View):
+    def post(self, request, pk, *args, **kwargs):
+        card = get_object_or_404(CardCode.objects.select_related("product"), pk=pk)
+        plaintext = card.reveal_code()
+        log_sensitive_operation(
+            request,
+            SensitiveOperationLog.Action.REVEAL_CARD_CODE,
+            card_code=card,
+            note="商家在库存列表中查看卡密。",
+            metadata={"product_id": card.product_id},
+        )
+        return JsonResponse({"ok": True, "code": plaintext, "masked_code": card.masked_code})
 
 
 class MerchantOrderListView(MerchantContextMixin, ListView):
@@ -607,11 +664,18 @@ class MerchantOrderActionView(MerchantRequiredMixin, View):
             messages.warning(request, f"订单 {order.order_no} 已标记为异常。")
         elif action == "resend_delivery":
             try:
-                recipient, count = send_delivery_codes_email(order)
+                recipient = send_delivery_reminder_email(order, request=request)
             except ValueError as exc:
                 messages.error(request, str(exc))
             else:
-                messages.success(request, f"已将 {count} 条发货内容重发到 {recipient}。")
+                log_sensitive_operation(
+                    request,
+                    SensitiveOperationLog.Action.SEND_DELIVERY_REMINDER,
+                    order=order,
+                    note="商家发送站内查看提醒邮件。",
+                    metadata={"recipient": recipient},
+                )
+                messages.success(request, f"已向 {recipient} 发送查看提醒，邮件中不再直接包含卡密。")
         else:
             messages.error(request, "未识别的订单操作。")
 
@@ -634,8 +698,48 @@ class MerchantOrderDetailView(MerchantContextMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["delivery_codes"] = collect_delivery_codes(self.object)
         return context
+
+
+class DeliveryRecordRevealView(View):
+    def post(self, request, order_no, delivery_id, *args, **kwargs):
+        delivery = get_object_or_404(
+            DeliveryRecord.objects.select_related("order_item__order", "order_item__order__user"),
+            pk=delivery_id,
+            order_item__order__order_no=order_no,
+        )
+        order = delivery.order_item.order
+
+        if request.user.is_authenticated:
+            user = request.user
+            if not (user == order.user or user.is_staff or user.is_superuser or user.is_merchant):
+                return JsonResponse({"ok": False, "message": "无权查看该发货内容。"}, status=403)
+            access_type = "merchant" if (user.is_staff or user.is_superuser or user.is_merchant) else "user"
+        else:
+            token = request.POST.get("access_token", "").strip()
+            if not token:
+                return JsonResponse({"ok": False, "message": "缺少访客访问令牌。"}, status=403)
+            try:
+                payload = load_guest_order_access_token(token)
+            except signing.BadSignature:
+                return JsonResponse({"ok": False, "message": "访问令牌无效或已过期。"}, status=403)
+            if payload.get("order_id") != order.id:
+                return JsonResponse({"ok": False, "message": "访问令牌无效。"}, status=403)
+            expected_emails = {value.lower() for value in (order.contact_email, order.user.email) if value}
+            if payload.get("email", "").lower() not in expected_emails:
+                return JsonResponse({"ok": False, "message": "访问令牌无效。"}, status=403)
+            access_type = "guest"
+
+        plaintext = delivery.reveal_display_code()
+        log_sensitive_operation(
+            request,
+            SensitiveOperationLog.Action.REVEAL_DELIVERY_CODE,
+            order=order,
+            delivery_record=delivery,
+            note="查看订单发货内容。",
+            metadata={"access_type": access_type},
+        )
+        return JsonResponse({"ok": True, "code": plaintext, "masked_code": delivery.masked_display_code})
 
 
 class ReorderView(LoginRequiredMixin, View):

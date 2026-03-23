@@ -122,7 +122,9 @@ class CardCodeBatchForm(forms.Form):
             seen.add(code)
             unique_codes.append(code)
 
-        existing_codes = list(CardCode.objects.filter(code__in=unique_codes).values_list("code", flat=True))
+        hash_to_code = {CardCode.build_code_hash(code): code for code in unique_codes}
+        existing_hashes = list(CardCode.objects.filter(code_hash__in=hash_to_code.keys()).values_list("code_hash", flat=True))
+        existing_codes = [hash_to_code[code_hash] for code_hash in existing_hashes]
         existing_code_set = set(existing_codes)
         importable_codes = [code for code in unique_codes if code not in existing_code_set]
         duplicate_samples = duplicate_in_upload + [code for code in existing_codes if code not in duplicate_in_upload]

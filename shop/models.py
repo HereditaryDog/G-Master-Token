@@ -5,6 +5,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
+from .security import decrypt_secret, encrypt_secret, hash_secret, is_encrypted_value, mask_secret
+
 
 def generate_order_no():
     return timezone.now().strftime("OD%Y%m%d%H%M%S") + get_random_string(4).upper()
@@ -136,7 +138,8 @@ class CardCode(TimeStampedModel):
         SOLD = "sold", "已售"
 
     product = models.ForeignKey(Product, related_name="card_codes", on_delete=models.CASCADE)
-    code = models.CharField("卡密内容", max_length=255, unique=True)
+    code = models.TextField("卡密密文")
+    code_hash = models.CharField("卡密哈希", max_length=64, unique=True, db_index=True, editable=False, null=True, blank=True)
     note = models.CharField("备注", max_length=120, blank=True)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.AVAILABLE)
     sold_at = models.DateTimeField("售出时间", null=True, blank=True)
@@ -146,8 +149,29 @@ class CardCode(TimeStampedModel):
         verbose_name = "卡密库存"
         verbose_name_plural = "卡密库存"
 
+    @staticmethod
+    def build_code_hash(code):
+        return hash_secret(code)
+
+    def set_plaintext_code(self, code):
+        self.code_hash = self.build_code_hash(code)
+        self.code = encrypt_secret(code)
+
+    def reveal_code(self):
+        return decrypt_secret(self.code)
+
+    @property
+    def masked_code(self):
+        return mask_secret(self.reveal_code())
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            plain_code = self.code if not is_encrypted_value(self.code) else decrypt_secret(self.code)
+            self.set_plaintext_code(plain_code)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.product.title} - {self.code[:12]}"
+        return f"{self.product.title} - {self.masked_code}"
 
 
 class Order(TimeStampedModel):
@@ -223,7 +247,7 @@ class DeliveryRecord(TimeStampedModel):
 
     order_item = models.ForeignKey(OrderItem, related_name="deliveries", on_delete=models.CASCADE)
     source = models.CharField("来源", max_length=20, choices=Source.choices)
-    display_code = models.CharField("交付内容", max_length=255)
+    display_code = models.TextField("交付密文")
     supplier_payload = models.JSONField("供应商返回", default=dict, blank=True)
     delivered_at = models.DateTimeField("交付时间", auto_now_add=True)
 
@@ -231,8 +255,20 @@ class DeliveryRecord(TimeStampedModel):
         verbose_name = "发货记录"
         verbose_name_plural = "发货记录"
 
+    def reveal_display_code(self):
+        return decrypt_secret(self.display_code)
+
+    @property
+    def masked_display_code(self):
+        return mask_secret(self.reveal_display_code())
+
+    def save(self, *args, **kwargs):
+        if self.display_code:
+            self.display_code = encrypt_secret(self.display_code)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.order_item.order.order_no} - {self.display_code[:16]}"
+        return f"{self.order_item.order.order_no} - {self.masked_display_code}"
 
 
 class PaymentAttempt(TimeStampedModel):
@@ -278,3 +314,39 @@ class InventoryImportBatch(TimeStampedModel):
 
     def __str__(self):
         return f"{self.product.title} - {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
+class SensitiveOperationLog(TimeStampedModel):
+    class Action(models.TextChoices):
+        REVEAL_CARD_CODE = "reveal_card_code", "查看库存卡密"
+        REVEAL_DELIVERY_CODE = "reveal_delivery_code", "查看发货内容"
+        SEND_DELIVERY_REMINDER = "send_delivery_reminder", "发送查看提醒"
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="sensitive_operation_logs",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    action = models.CharField("操作类型", max_length=40, choices=Action.choices)
+    order = models.ForeignKey("Order", related_name="sensitive_logs", on_delete=models.SET_NULL, null=True, blank=True)
+    card_code = models.ForeignKey("CardCode", related_name="sensitive_logs", on_delete=models.SET_NULL, null=True, blank=True)
+    delivery_record = models.ForeignKey(
+        "DeliveryRecord",
+        related_name="sensitive_logs",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    ip_address = models.GenericIPAddressField("来源 IP", null=True, blank=True)
+    note = models.CharField("备注", max_length=240, blank=True)
+    metadata = models.JSONField("元数据", default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "敏感操作日志"
+        verbose_name_plural = "敏感操作日志"
+
+    def __str__(self):
+        return f"{self.action} - {self.created_at:%Y-%m-%d %H:%M:%S}"

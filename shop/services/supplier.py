@@ -56,7 +56,7 @@ def fulfill_stock_item(order_item):
         DeliveryRecord.objects.create(
             order_item=order_item,
             source=DeliveryRecord.Source.STOCK,
-            display_code=card.code,
+            display_code=card.reveal_code(),
             supplier_payload={"note": card.note},
         )
 
