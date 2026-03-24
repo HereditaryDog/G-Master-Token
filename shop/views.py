@@ -1070,7 +1070,7 @@ class StripeWebhookView(View):
 
 class HealthView(View):
     def get(self, request, *args, **kwargs):
-        return JsonResponse({"ok": True, "service": "web_0.0.1"})
+        return JsonResponse({"ok": True, "service": settings.SITE_NAME})
 
 
 class ReadinessView(View):

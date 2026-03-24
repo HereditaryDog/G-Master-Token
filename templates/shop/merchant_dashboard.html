@@ -8,15 +8,38 @@
     {% include "shop/partials/merchant_sidebar.html" %}
 
     <div class="merchant-main">
-        <section class="section-heading">
-            <div>
-                <p class="eyebrow">Merchant Console</p>
-                <h1>商城管理后台</h1>
-            </div>
-            <div class="hero-actions">
-                <a class="ghost-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
-                <a class="ghost-button" href="{% url 'shop:merchant_inventory' %}">导入卡密</a>
-                <a class="ghost-button" href="/admin/">高级后台</a>
+        <section class="merchant-console-hero">
+            <div class="merchant-console-hero__grid">
+                <div>
+                    <p class="eyebrow">Merchant Console</p>
+                    <h1>商城管理后台</h1>
+                    <p class="muted">把商品、库存、订单和客服状态集中到一张总览桌面里，先看到风险，再处理动作。</p>
+                    <div class="hero-actions">
+                        <a class="ghost-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
+                        <a class="ghost-button" href="{% url 'shop:merchant_inventory' %}">导入卡密</a>
+                        <a class="ghost-button" href="/admin/">高级后台</a>
+                    </div>
+                </div>
+                <div class="merchant-console-hero__panel">
+                    <div class="merchant-kpi-grid">
+                        <article class="merchant-kpi">
+                            <span>分类</span>
+                            <strong>{{ category_count }}</strong>
+                        </article>
+                        <article class="merchant-kpi">
+                            <span>帮助文章</span>
+                            <strong>{{ article_count }}</strong>
+                        </article>
+                        <article class="merchant-kpi">
+                            <span>待客服处理</span>
+                            <strong>{{ pending_support_ticket_count }}</strong>
+                        </article>
+                        <article class="merchant-kpi">
+                            <span>库存预警</span>
+                            <strong>{{ low_stock_products|length }}</strong>
+                        </article>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -66,17 +89,19 @@
             </div>
             <div class="content-card soft">
                 <h3>低库存提醒</h3>
-                {% for product in low_stock_products %}
-                    <div class="row-line">
-                        <div>
-                            <strong>{{ product.title }}</strong>
-                            <p class="muted">库存 {{ product.inventory_count }} 张 / 阈值 {{ product.low_stock_threshold }} 张</p>
+                <div class="merchant-mini-list">
+                    {% for product in low_stock_products %}
+                        <div class="merchant-mini-item">
+                            <div>
+                                <strong>{{ product.title }}</strong>
+                                <p class="muted">库存 {{ product.inventory_count }} 张 / 阈值 {{ product.low_stock_threshold }} 张</p>
+                            </div>
+                            <a href="{% url 'shop:merchant_inventory' %}?product={{ product.id }}">去补库存</a>
                         </div>
-                        <a href="{% url 'shop:merchant_inventory' %}?product={{ product.id }}">去补库存</a>
-                    </div>
-                {% empty %}
-                    <p class="muted">当前没有低库存商品。</p>
-                {% endfor %}
+                    {% empty %}
+                        <p class="muted">当前没有低库存商品。</p>
+                    {% endfor %}
+                </div>
             </div>
         </section>
     </div>

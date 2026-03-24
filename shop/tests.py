@@ -75,7 +75,8 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "测试分类")
         self.assertContains(response, "测试公告")
-        self.assertContains(response, "测试教程")
+        self.assertContains(response, "浏览商品")
+        self.assertContains(response, "按分类快速浏览")
 
     def test_mock_payment_completes_order_and_delivers_code(self):
         client = Client()

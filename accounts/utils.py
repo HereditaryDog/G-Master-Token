@@ -68,7 +68,7 @@ def send_signup_email_code(email):
     )
     try:
         send_mail(
-            subject="web_0.0.1 注册邮箱验证码",
+            subject=f"{settings.SITE_NAME} 注册邮箱验证码",
             message=f"你的注册验证码是：{code}\n\n{expiry_minutes} 分钟内有效，请勿泄露给他人。",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],

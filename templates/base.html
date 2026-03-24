@@ -4,7 +4,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b312c">
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/site.css' %}">
 </head>
 <body>
@@ -51,10 +55,167 @@
             {% block content %}{% endblock %}
         </main>
 
+        {% if ui_debug_enabled %}
+            <details class="ui-debug-panel">
+                <summary>UI 调试</summary>
+                <div class="ui-debug-panel__body">
+                    <p class="ui-debug-panel__note">仅本地开发环境可见，调节结果会保存在当前浏览器。</p>
+
+                    <label class="ui-debug-control">
+                        <span>页面宽度</span>
+                        <div class="ui-debug-control__row">
+                            <input type="range" min="1180" max="1480" step="10" value="1380" data-ui-var="--ui-page-width" data-ui-unit="px" data-ui-default="1380">
+                            <output>1380px</output>
+                        </div>
+                    </label>
+
+                    <label class="ui-debug-control">
+                        <span>正文字号</span>
+                        <div class="ui-debug-control__row">
+                            <input type="range" min="14" max="18" step="0.1" value="16" data-ui-var="--ui-body-font-size" data-ui-unit="px" data-ui-default="16">
+                            <output>16px</output>
+                        </div>
+                    </label>
+
+                    <label class="ui-debug-control">
+                        <span>字间距</span>
+                        <div class="ui-debug-control__row">
+                            <input type="range" min="-0.02" max="0.02" step="0.001" value="-0.004" data-ui-var="--ui-body-letter-spacing" data-ui-unit="em" data-ui-default="-0.004">
+                            <output>-0.004em</output>
+                        </div>
+                    </label>
+
+                    <label class="ui-debug-control">
+                        <span>Hero 标题比例</span>
+                        <div class="ui-debug-control__row">
+                            <input type="range" min="0.8" max="1.25" step="0.01" value="1" data-ui-var="--ui-hero-title-scale" data-ui-default="1">
+                            <output>1</output>
+                        </div>
+                    </label>
+
+                    <label class="ui-debug-control">
+                        <span>商品浮层宽度</span>
+                        <div class="ui-debug-control__row">
+                            <input type="range" min="240" max="400" step="4" value="330" data-ui-var="--ui-card-overlay-width" data-ui-unit="px" data-ui-default="330">
+                            <output>330px</output>
+                        </div>
+                    </label>
+
+                    <label class="ui-debug-control">
+                        <span>卡片圆角</span>
+                        <div class="ui-debug-control__row">
+                            <input type="range" min="18" max="40" step="1" value="32" data-ui-var="--ui-surface-radius" data-ui-unit="px" data-ui-default="32">
+                            <output>32px</output>
+                        </div>
+                    </label>
+
+                    <button type="button" class="ghost-button ui-debug-panel__reset">重置调试值</button>
+                </div>
+            </details>
+        {% endif %}
+
         <footer class="site-footer">
-            <span>{{ site_name }}</span>
-            <span>Version {{ project_version }}</span>
+            <div class="site-footer__grid">
+                <div class="site-footer__brand">
+                    <a class="brand-mark" href="{% url 'shop:storefront' %}">
+                        <span class="brand-dot"></span>
+                        <span>{{ site_name }}</span>
+                    </a>
+                    <p class="brand-subtitle">面向虚拟商品、卡密交付和订单查询场景的自动发卡平台。</p>
+                    <span class="site-footer__version">Version {{ project_version }}</span>
+                </div>
+
+                <div class="site-footer__column">
+                    <h3>快速导航</h3>
+                    <a href="{% url 'shop:storefront' %}">首页</a>
+                    <a href="{% url 'shop:order_lookup' %}">订单查询</a>
+                    <a href="{% url 'shop:help_center' %}">帮助中心</a>
+                </div>
+
+                <div class="site-footer__column">
+                    <h3>帮助支持</h3>
+                    <a href="{% url 'shop:support' %}">客服支持</a>
+                    <a href="{% url 'shop:account_center' %}">账号中心</a>
+                    <a href="{% url 'password_reset' %}">找回密码</a>
+                </div>
+
+                <div class="site-footer__column">
+                    <h3>商家入口</h3>
+                    <a href="{% url 'shop:merchant_dashboard' %}">商家后台</a>
+                    <a href="/admin/">Admin</a>
+                    <span class="site-footer__note">库存、订单、发货与客服统一管理</span>
+                </div>
+            </div>
         </footer>
     </div>
+
+    {% if ui_debug_enabled %}
+        <script>
+        (function () {
+            const storageKey = "gmaster-ui-debug";
+            const panel = document.querySelector(".ui-debug-panel");
+            if (!panel) return;
+
+            const inputs = Array.from(panel.querySelectorAll("input[data-ui-var]"));
+            const resetButton = panel.querySelector(".ui-debug-panel__reset");
+            const rootStyle = document.documentElement.style;
+
+            function formatValue(value, unit) {
+                return `${value}${unit || ""}`;
+            }
+
+            function updateOutput(input) {
+                const output = input.parentElement.querySelector("output");
+                if (output) {
+                    output.textContent = formatValue(input.value, input.dataset.uiUnit || "");
+                }
+            }
+
+            function applyInput(input) {
+                rootStyle.setProperty(input.dataset.uiVar, formatValue(input.value, input.dataset.uiUnit || ""));
+                updateOutput(input);
+            }
+
+            function loadState() {
+                try {
+                    return JSON.parse(localStorage.getItem(storageKey) || "{}");
+                } catch (error) {
+                    return {};
+                }
+            }
+
+            function saveState() {
+                const payload = {};
+                inputs.forEach((input) => {
+                    payload[input.dataset.uiVar] = input.value;
+                });
+                localStorage.setItem(storageKey, JSON.stringify(payload));
+            }
+
+            const savedState = loadState();
+            inputs.forEach((input) => {
+                const savedValue = savedState[input.dataset.uiVar];
+                if (savedValue !== undefined) {
+                    input.value = savedValue;
+                }
+                applyInput(input);
+                input.addEventListener("input", function () {
+                    applyInput(input);
+                    saveState();
+                });
+            });
+
+            if (resetButton) {
+                resetButton.addEventListener("click", function () {
+                    inputs.forEach((input) => {
+                        input.value = input.dataset.uiDefault || input.defaultValue;
+                        applyInput(input);
+                    });
+                    localStorage.removeItem(storageKey);
+                });
+            }
+        })();
+        </script>
+    {% endif %}
 </body>
 </html>

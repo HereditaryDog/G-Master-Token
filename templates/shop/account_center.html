@@ -33,6 +33,17 @@
                 <strong>{{ request.user.phone|default:"-" }}</strong>
             </article>
         </div>
+
+        <div class="account-quick-grid">
+            <a class="account-quick-card" href="{% url 'shop:order_lookup' %}">
+                <span>访客查单</span>
+                <strong>用订单号和邮箱快速核对状态</strong>
+            </a>
+            <a class="account-quick-card" href="{% url 'shop:support' %}">
+                <span>客服支持</span>
+                <strong>提交工单、补充截图和持续跟进</strong>
+            </a>
+        </div>
     </section>
 
     <section class="content-card soft account-orders-card">
@@ -120,6 +131,34 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </section>
+
+    <section class="content-card soft">
+        <div class="section-heading mini">
+            <div>
+                <p class="eyebrow">Support</p>
+                <h2>最近工单</h2>
+            </div>
+            <a class="ghost-button" href="{% url 'shop:support' %}">前往客服中心</a>
+        </div>
+        <div class="support-mini-list">
+            {% for ticket in recent_support_tickets %}
+                <a class="support-ticket-row" href="{% url 'shop:support_ticket_detail' ticket.ticket_no %}">
+                    <div>
+                        <strong>{{ ticket.ticket_no }}</strong>
+                        <p class="muted">{{ ticket.subject }}</p>
+                    </div>
+                    <div class="support-ticket-meta">
+                        <span class="pill">{{ ticket.get_status_display }}</span>
+                        <small class="muted">{{ ticket.last_message_at|date:"Y-m-d H:i" }}</small>
+                    </div>
+                </a>
+            {% empty %}
+                <div class="table-card compact">
+                    <p class="muted">当前没有工单记录。遇到问题时可以直接从客服中心发起。</p>
+                </div>
+            {% endfor %}
         </div>
     </section>
 </section>

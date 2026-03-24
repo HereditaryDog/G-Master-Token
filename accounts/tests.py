@@ -175,7 +175,7 @@ class AccountAuthFlowTests(TestCase):
     def test_login_page_uses_configured_site_name(self):
         response = self.client.get(reverse("accounts:login"), HTTP_HOST="127.0.0.1:8000")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "web_0.0.1")
+        self.assertContains(response, "G-Master发卡网")
 
     def test_login_page_contains_password_reset_link(self):
         response = self.client.get(reverse("accounts:login"))

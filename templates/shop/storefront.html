@@ -6,54 +6,33 @@
 {% block content %}
 <section class="apple-home">
     <section class="apple-hero">
-        <p class="eyebrow">Version {{ project_version }}</p>
-        <h1>开发者的 Token 充值与自动发卡站</h1>
-        <p class="lead apple-hero-lead">
-            下单、支付、查单、教程和商家管理都整合在一个轻量、直接、可持续扩展的站点里。
-        </p>
-        <div class="hero-actions hero-actions--center">
-            <a class="primary-button" href="#products">浏览商品</a>
-            <a class="ghost-button" href="{% url 'shop:order_lookup' %}">订单查询</a>
-        </div>
-        <form method="get" class="search-bar search-bar--hero">
-            <input type="text" name="q" value="{{ keyword }}" placeholder="搜索商品名称、摘要或关键词">
-            {% if current_category %}
-                <input type="hidden" name="category" value="{{ current_category }}">
-            {% endif %}
-            <button type="submit" class="primary-button">搜索</button>
-        </form>
-    </section>
-
-    <section class="apple-feature-grid">
-        <article class="feature-panel feature-panel--light">
-            <p class="eyebrow">What It Does</p>
-            <h2>从下单到发货，一站完成。</h2>
-            <p class="muted">
-                面向开发者和数字商品场景，支持用人民币购买美元充值卡、组合套餐、订单查询和帮助中心。
-            </p>
-            <div class="trust-grid">
-                <div class="trust-badge">24 小时自动发货</div>
-                <div class="trust-badge">库存卡密 + API 双供货</div>
-                <div class="trust-badge">支持订单号 + 邮箱查单</div>
-                <div class="trust-badge">公告和教程可后台维护</div>
+        <div class="apple-hero__grid">
+            <div class="apple-hero__main">
+                <h1>{{ site_name }}</h1>
+                <div class="hero-actions hero-actions--center">
+                    <a class="primary-button" href="#products">浏览商品</a>
+                    <a class="ghost-button" href="{% url 'shop:order_lookup' %}">订单查询</a>
+                </div>
+                <form method="get" class="search-bar search-bar--hero">
+                    <input type="text" name="q" value="{{ keyword }}" placeholder="搜索商品名称、摘要或关键词">
+                    {% if current_category %}
+                        <input type="hidden" name="category" value="{{ current_category }}">
+                    {% endif %}
+                    <button type="submit" class="primary-button">搜索</button>
+                </form>
             </div>
-        </article>
-
-        <article class="feature-panel feature-panel--dark">
-            <p class="eyebrow">Order Lookup</p>
-            <h2>查单更快一点。</h2>
-            <p class="muted muted-on-dark">输入订单号和邮箱，立即查看支付状态和发货结果。</p>
-            <form method="post" action="{% url 'shop:order_lookup' %}" class="form-grid compact">
-                {% csrf_token %}
-                {% for field in lookup_form %}
-                    <label class="field">
-                        <span>{{ field.label }}</span>
-                        {{ field }}
-                    </label>
-                {% endfor %}
-                <button type="submit" class="primary-button">立即查询</button>
-            </form>
-        </article>
+            <aside class="hero-spotlight hero-spotlight--brand">
+                <div class="hero-brand-frame">
+                    <div class="hero-brand-mark">G</div>
+                    <div class="hero-brand-chip-grid">
+                        <span class="hero-brand-chip hero-brand-chip--primary">自动发卡</span>
+                        <span class="hero-brand-chip">订单查询</span>
+                        <span class="hero-brand-chip">库存卡密</span>
+                        <span class="hero-brand-chip">支付结果</span>
+                    </div>
+                </div>
+            </aside>
+        </div>
     </section>
 
     <section class="category-strip">
@@ -108,10 +87,19 @@
         <div class="product-grid product-grid--apple">
             {% for product in products %}
                 <article class="product-card product-card--apple">
-                    <div class="product-card__visual" style="background-image: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0)), url('{{ product.cover_url }}');">
-                        {% if product.badge %}
-                            <span class="pill">{{ product.badge }}</span>
+                    <div
+                        class="product-card__visual {% if not product.cover_url %}product-card__visual--fallback{% endif %}"
+                        {% if product.cover_url %}
+                            style="background-image: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0)), url('{{ product.cover_url }}');"
                         {% endif %}
+                    >
+                        <div class="product-card__visual-copy product-card__visual-copy--glass">
+                            {% if product.category %}
+                                <span class="product-card__visual-kicker">{{ product.category.name }}</span>
+                            {% endif %}
+                            <strong class="product-card__visual-value">{{ product.face_value|usd }}</strong>
+                            <span class="product-card__visual-meta">{{ product.get_delivery_method_display }}</span>
+                        </div>
                     </div>
                     <div class="product-card__body">
                         <div class="product-card__meta product-card__meta--stacked">
@@ -152,26 +140,5 @@
         </div>
     </section>
 
-    <section class="article-section">
-        <div class="section-intro">
-            <p class="eyebrow">Help Center</p>
-            <h2>热门帮助文章</h2>
-            <p class="muted">教程、FAQ 和售后说明，统一放在一个更像产品支持页面的入口里。</p>
-        </div>
-        <section class="article-grid article-grid--apple">
-            {% for article in featured_articles %}
-                <article class="content-card soft article-card article-card--apple">
-                    <span class="pill">{{ article.get_section_display }}</span>
-                    <h3>{{ article.title }}</h3>
-                    <p class="muted">{{ article.summary }}</p>
-                    <a href="{% url 'shop:help_article_detail' article.slug %}">阅读文章</a>
-                </article>
-            {% empty %}
-                <div class="content-card soft">
-                    <p class="muted">还没有帮助文章，后续可在后台继续维护。</p>
-                </div>
-            {% endfor %}
-        </section>
-    </section>
 </section>
 {% endblock %}

@@ -6,7 +6,12 @@
 {% block content %}
 <section class="product-detail-shell">
     <section class="detail-layout">
-        <div class="detail-visual detail-visual--product" style="background-image: linear-gradient(180deg, rgba(8,18,32,.16), rgba(8,18,32,.62)), url('{{ product.cover_url }}');">
+        <div
+            class="detail-visual detail-visual--product {% if not product.cover_url %}detail-visual--fallback{% endif %}"
+            {% if product.cover_url %}
+                style="background-image: linear-gradient(180deg, rgba(8,18,32,.16), rgba(8,18,32,.62)), url('{{ product.cover_url }}');"
+            {% endif %}
+        >
             <div class="detail-copy">
                 <div class="detail-copy__badges">
                     {% if product.badge %}
@@ -19,6 +24,13 @@
                 <p class="eyebrow">{{ product.inventory_label }}</p>
                 <h1>{{ product.title }}</h1>
                 <p class="lead">{{ product.summary }}</p>
+                <div class="detail-hero-chip-row">
+                    <span class="detail-chip">{{ product.get_delivery_method_display }}</span>
+                    <span class="detail-chip">{{ product.inventory_label }}</span>
+                    {% if product.category %}
+                        <span class="detail-chip">{{ product.category.name }}</span>
+                    {% endif %}
+                </div>
                 <div class="detail-facts">
                     <div class="detail-fact">
                         <span>充值面值</span>
@@ -68,6 +80,29 @@
                 </div>
             </div>
 
+            <div class="detail-buy-panel">
+                <div class="detail-buy-grid">
+                    <div class="detail-buy-card">
+                        <span>适合场景</span>
+                        <strong>{% if product.delivery_method == "stock_card" %}快速交付与即时使用{% else %}联调、补货与中高金额场景{% endif %}</strong>
+                    </div>
+                    <div class="detail-buy-card">
+                        <span>查询方式</span>
+                        <strong>账号中心 / 订单号 + 邮箱</strong>
+                    </div>
+                </div>
+                <div class="detail-promise-list">
+                    <div class="detail-promise">
+                        <strong>下单后流程</strong>
+                        <span>创建订单、进入支付、完成自动发货。</span>
+                    </div>
+                    <div class="detail-promise">
+                        <strong>异常处理</strong>
+                        <span>支持订单查询、提醒邮件和客服工单跟进。</span>
+                    </div>
+                </div>
+            </div>
+
             {% if request.user.is_authenticated %}
                 <form method="post" action="{% url 'shop:create_order' product.slug %}" class="form-grid compact">
                     {% csrf_token %}
@@ -98,10 +133,22 @@
             <div class="product-grid product-grid--apple">
                 {% for related in related_products %}
                     <article class="product-card product-card--apple product-card--compact">
-                        <div class="product-card__visual product-card__visual--compact" style="background-image: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0)), url('{{ related.cover_url }}');">
+                        <div
+                            class="product-card__visual product-card__visual--compact {% if not related.cover_url %}product-card__visual--fallback{% endif %}"
+                            {% if related.cover_url %}
+                                style="background-image: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0)), url('{{ related.cover_url }}');"
+                            {% endif %}
+                        >
                             {% if related.badge %}
                                 <span class="pill">{{ related.badge }}</span>
                             {% endif %}
+                            <div class="product-card__visual-copy">
+                                {% if related.category %}
+                                    <span class="eyebrow">{{ related.category.name }}</span>
+                                {% endif %}
+                                <strong class="product-card__visual-value">{{ related.face_value|usd }}</strong>
+                                <span class="product-card__visual-meta">{{ related.get_delivery_method_display }}</span>
+                            </div>
                         </div>
                         <div class="product-card__body">
                             <div class="product-card__meta product-card__meta--stacked">

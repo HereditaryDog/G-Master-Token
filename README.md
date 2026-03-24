@@ -1,12 +1,12 @@
-# web_0.0.1
+# G-Master发卡网
 
 ## 版本号
 
-当前版本：`0.1.2`
+当前版本：`0.1.3`
 
 ## 项目介绍
 
-`web_0.0.1` 是一个面向数字点卡与 Token 充值场景的 Django 商城项目。  
+`G-Master发卡网` 是一个面向数字点卡与 Token 充值场景的 Django 商城项目。  
 当前包含前台商城、用户注册登录、订单系统、商家后台、帮助中心、邮件通知、库存卡密管理，以及支付与供货接口的预留结构。
 
 ## 前后端完成程度
@@ -62,7 +62,7 @@ python manage.py preflight_check
 DJANGO_SECRET_KEY=replace-me
 DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
-SITE_NAME=web_0.0.1
+SITE_NAME=G-Master发卡网
 SITE_BASE_URL=
 CARD_SECRET_KEY=
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
@@ -80,6 +80,13 @@ EMAIL_HOST_PASSWORD=your-app-password
 ## 更新日志
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)
+
+### 0.1.3
+
+- 统一品牌名为 `G-Master发卡网`
+- 首页、商品卡、页脚与关键页面视觉继续重构，并补齐更稳定的排版细节
+- 新增本地 `UI 调试` 面板，可直接在浏览器里实时微调样式变量
+- 当前全量测试已通过
 
 ### 0.1.2
 
