@@ -26,6 +26,9 @@
             <div class="row-line"><span>支付方式</span><strong>{{ order.payment_provider|default:"未生成" }}</strong></div>
             <div class="row-line"><span>支付流水</span><strong>{{ order.payment_reference|default:"-" }}</strong></div>
             <div class="row-line"><span>订单金额</span><strong>{{ order.total_amount|cny }}</strong></div>
+            {% if order.payment_status == "paid" and order.status == "failed" %}
+                <p class="muted">支付已经确认，但自动发货暂未完成。商家补货或排查后会重新处理，你也可以通过客服工单继续跟进。</p>
+            {% endif %}
         </div>
         <div class="content-card soft">
             <h3>已发货内容</h3>

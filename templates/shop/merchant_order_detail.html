@@ -61,6 +61,15 @@
                 </div>
             </div>
             <div class="action-stack">
+                {% if order.payment_status == "paid" and order.status == "failed" %}
+                    <form method="post" action="{% url 'shop:merchant_order_action' order.order_no %}" class="inline-action-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="retry_fulfillment">
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <button type="submit" class="primary-button">重试自动发货</button>
+                    </form>
+                {% endif %}
+
                 <form method="post" action="{% url 'shop:merchant_order_action' order.order_no %}" class="inline-action-form">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="resend_delivery">

@@ -72,6 +72,14 @@
                                     <div class="table-actions">
                                         <a class="ghost-button" href="{% url 'shop:merchant_order_detail' order.order_no %}">查看</a>
                                         <a class="ghost-button" href="{% url 'shop:merchant_order_detail' order.order_no %}#delivery-records">发货内容</a>
+                                        {% if order.payment_status == "paid" and order.status == "failed" %}
+                                            <form method="post" action="{% url 'shop:merchant_order_action' order.order_no %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="retry_fulfillment">
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <button type="submit" class="primary-button">重试发货</button>
+                                            </form>
+                                        {% endif %}
                                         <form method="post" action="{% url 'shop:merchant_order_action' order.order_no %}">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="resend_delivery">

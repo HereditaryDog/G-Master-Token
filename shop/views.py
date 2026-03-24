@@ -50,7 +50,7 @@ from .security import (
     load_guest_order_access_token,
     mask_secret,
 )
-from .services.order_flow import create_single_item_order, mark_order_paid
+from .services.order_flow import create_single_item_order, mark_order_paid, retry_order_fulfillment
 from .services.payment import (
     create_checkout_session,
     get_default_gateway_code,
@@ -933,6 +933,15 @@ class MerchantOrderActionView(MerchantRequiredMixin, View):
             order.merchant_note = merchant_note
             order.save(update_fields=["status", "merchant_note", "updated_at"])
             messages.warning(request, f"订单 {order.order_no} 已标记为异常。")
+        elif action == "retry_fulfillment":
+            if order.payment_status != Order.PaymentStatus.PAID:
+                messages.error(request, "只有已支付订单才能重试自动发货。")
+            else:
+                order = retry_order_fulfillment(order)
+                if order.status == Order.Status.COMPLETED:
+                    messages.success(request, f"订单 {order.order_no} 已重试发货并恢复完成。")
+                else:
+                    messages.warning(request, "已再次尝试自动发货，但当前仍未成功，请检查库存或供应接口。")
         elif action == "resend_delivery":
             try:
                 recipient = send_delivery_reminder_email(order, request=request)

@@ -71,8 +71,12 @@ def _fulfill_paid_order(order_id):
         order = Order.objects.select_for_update().get(pk=order_id)
         if order.status == Order.Status.COMPLETED:
             return order
-        if order.status == Order.Status.FAILED:
-            return order
+        if order.payment_status != Order.PaymentStatus.PAID:
+            raise ValueError("Only paid orders can be fulfilled.")
+
+        if order.status != Order.Status.FULFILLING:
+            order.status = Order.Status.FULFILLING
+            order.save(update_fields=["status", "updated_at"])
 
         for item in order.items.select_related("product").all():
             fulfill_item(item)
@@ -104,3 +108,17 @@ def mark_order_paid(order, provider, reference, payload=None):
     except Exception:
         logger.exception("Failed to fulfill paid order %s", paid_order.order_no)
         return _mark_fulfillment_failed(paid_order.pk)
+
+
+def retry_order_fulfillment(order):
+    if order.payment_status != Order.PaymentStatus.PAID:
+        raise ValueError("Only paid orders can retry fulfillment.")
+
+    try:
+        return _fulfill_paid_order(order.pk)
+    except FulfillmentError as exc:
+        logger.warning("Fulfillment retry failed for paid order %s: %s", order.order_no, exc)
+        return _mark_fulfillment_failed(order.pk)
+    except Exception:
+        logger.exception("Unexpected fulfillment retry failure for paid order %s", order.order_no)
+        return _mark_fulfillment_failed(order.pk)

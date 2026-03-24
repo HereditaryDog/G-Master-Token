@@ -330,6 +330,24 @@ class MerchantOperationsTests(TestCase):
         self.completed_order = create_single_item_order(self.buyer, self.product, 1)
         mark_order_paid(self.completed_order, provider="mock", reference="mock-completed")
         self.pending_order = create_single_item_order(self.buyer, self.product, 1)
+        self.out_of_stock_product = Product.objects.create(
+            category=self.category,
+            title="Retry Card",
+            slug="retry-card",
+            summary="补货后可重试发货",
+            description="补货后可重试发货详情",
+            face_value="50.00",
+            token_amount=5000000,
+            price="299.00",
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+            is_active=True,
+        )
+        self.failed_paid_order = create_single_item_order(self.buyer, self.out_of_stock_product, 1)
+        self.failed_paid_order = mark_order_paid(
+            self.failed_paid_order,
+            provider="mock",
+            reference="mock-failed-paid",
+        )
 
     def test_merchant_order_filters_by_query_and_payment_status(self):
         self.client.force_login(self.owner)
@@ -351,6 +369,35 @@ class MerchantOperationsTests(TestCase):
         self.pending_order.refresh_from_db()
         self.assertEqual(self.pending_order.status, Order.Status.FAILED)
         self.assertEqual(self.pending_order.merchant_note, "用户反馈订单异常。")
+
+    def test_merchant_can_retry_failed_paid_order_after_restock(self):
+        self.assertEqual(self.failed_paid_order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(self.failed_paid_order.status, Order.Status.FAILED)
+        CardCode.objects.create(product=self.out_of_stock_product, code="RETRY-CODE-0001")
+
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_order_action", args=[self.failed_paid_order.order_no]),
+            {"action": "retry_fulfillment"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.failed_paid_order.refresh_from_db()
+        self.assertEqual(self.failed_paid_order.status, Order.Status.COMPLETED)
+        self.assertEqual(self.failed_paid_order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(DeliveryRecord.objects.filter(order_item__order=self.failed_paid_order).count(), 1)
+
+    def test_merchant_cannot_retry_unpaid_order_fulfillment(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_order_action", args=[self.pending_order.order_no]),
+            {"action": "retry_fulfillment"},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.pending_order.refresh_from_db()
+        self.assertEqual(self.pending_order.status, Order.Status.PENDING_PAYMENT)
 
     @override_settings(SITE_BASE_URL="")
     def test_merchant_can_resend_delivery_email_uses_request_host_when_public_base_url_not_configured(self):
