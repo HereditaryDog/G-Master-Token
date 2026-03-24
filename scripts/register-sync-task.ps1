@@ -6,6 +6,6 @@ $taskName = "web001-auto-sync"
 $taskCommand = "powershell.exe -ExecutionPolicy Bypass -File `"$scriptPath`""
 
 schtasks.exe /Delete /TN $taskName /F *> $null
-schtasks.exe /Create /SC MINUTE /MO 30 /TN $taskName /TR $taskCommand /F | Out-Null
+schtasks.exe /Create /SC MINUTE /MO 30 /TN $taskName /TR $taskCommand /RU SYSTEM /F | Out-Null
 
 Write-Output "Registered scheduled task: $taskName"
