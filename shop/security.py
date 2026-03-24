@@ -51,6 +51,38 @@ def mask_secret(value, visible_prefix=4, visible_suffix=4):
     return f"{value[:visible_prefix]}...{value[-visible_suffix:]}"
 
 
+def get_request_ip(request):
+    remote_addr = (request.META.get("REMOTE_ADDR") or "").strip()
+    trusted_proxies = set(getattr(settings, "TRUSTED_PROXY_IPS", []))
+
+    if remote_addr in trusted_proxies:
+        forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        real_ip = (request.META.get("HTTP_X_REAL_IP") or "").strip()
+        if real_ip:
+            return real_ip
+
+    return remote_addr
+
+
+def is_request_ip_allowed(request, allowlist):
+    if not allowlist:
+        return True
+    return get_request_ip(request) in allowlist
+
+
+def is_merchant_user(user):
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (
+            getattr(user, "is_staff", False)
+            or getattr(user, "is_superuser", False)
+            or getattr(user, "is_merchant", False)
+        )
+    )
+
+
 def build_guest_order_access_token(order, email):
     return signing.dumps(
         {"order_id": order.id, "email": email.lower()},

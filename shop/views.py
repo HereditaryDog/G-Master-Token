@@ -42,7 +42,14 @@ from .models import (
     SupportTicketMessage,
 )
 from .deployment_checks import run_readiness_checks
-from .security import build_guest_order_access_token, load_guest_order_access_token, mask_secret
+from .security import (
+    build_guest_order_access_token,
+    get_request_ip,
+    is_merchant_user,
+    is_request_ip_allowed,
+    load_guest_order_access_token,
+    mask_secret,
+)
 from .services.order_flow import create_single_item_order, mark_order_paid
 from .services.payment import (
     create_checkout_session,
@@ -57,11 +64,13 @@ def collect_delivery_codes(order):
     return [delivery.reveal_display_code() for item in order.items.all() for delivery in item.deliveries.all()]
 
 
-def get_client_ip(request):
-    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "")
+def is_paid_checkout_session_for_order(order, checkout_data, *, session_id=""):
+    if not checkout_data or checkout_data.get("payment_status") != "paid":
+        return False
+    if session_id and checkout_data.get("id") and checkout_data["id"] != session_id:
+        return False
+    metadata = checkout_data.get("metadata") or {}
+    return metadata.get("order_no") == order.order_no
 
 
 def log_sensitive_operation(request, action, *, order=None, card_code=None, delivery_record=None, note="", metadata=None):
@@ -71,7 +80,7 @@ def log_sensitive_operation(request, action, *, order=None, card_code=None, deli
         order=order,
         card_code=card_code,
         delivery_record=delivery_record,
-        ip_address=get_client_ip(request),
+        ip_address=get_request_ip(request),
         note=note,
         metadata=metadata or {},
     )
@@ -168,8 +177,7 @@ def append_support_message(ticket, *, sender=None, sender_role, body, status, as
 
 class MerchantRequiredMixin(UserPassesTestMixin):
     def test_func(self):
-        user = self.request.user
-        return user.is_authenticated and (user.is_staff or user.is_superuser or user.is_merchant)
+        return is_merchant_user(self.request.user)
 
 
 class MerchantContextMixin(MerchantRequiredMixin):
@@ -218,6 +226,9 @@ class ProductDetailView(DetailView):
     context_object_name = "product"
     slug_field = "slug"
     slug_url_kwarg = "slug"
+
+    def get_queryset(self):
+        return Product.objects.filter(is_active=True).select_related("category")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -300,25 +311,30 @@ class StartPaymentView(LoginRequiredMixin, View):
 class MockPaymentView(LoginRequiredMixin, TemplateView):
     template_name = "shop/mock_pay.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.order = get_object_or_404(Order, order_no=kwargs["order_no"], user=request.user)
-        return super().dispatch(request, *args, **kwargs)
+    def get_order(self):
+        if not hasattr(self, "_order"):
+            self._order = get_object_or_404(Order, order_no=self.kwargs["order_no"], user=self.request.user)
+        return self._order
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["order"] = self.order
+        context["order"] = self.get_order()
         return context
 
     def post(self, request, *args, **kwargs):
-        if self.order.payment_status != Order.PaymentStatus.PAID:
-            mark_order_paid(
-                self.order,
+        order = self.get_order()
+        if order.payment_status != Order.PaymentStatus.PAID:
+            order = mark_order_paid(
+                order,
                 provider="mock",
-                reference=f"mock-{self.order.order_no}",
+                reference=f"mock-{order.order_no}",
                 payload={"mode": "local-demo"},
             )
-            messages.success(request, "模拟支付成功，订单已经自动发货。")
-        return redirect("shop:order_detail", order_no=self.order.order_no)
+            if order.status == Order.Status.FAILED:
+                messages.warning(request, "模拟支付已确认，但自动发货失败，请联系商家处理。")
+            else:
+                messages.success(request, "模拟支付成功，订单已经自动发货。")
+        return redirect("shop:order_detail", order_no=order.order_no)
 
 
 class PaymentSuccessView(LoginRequiredMixin, TemplateView):
@@ -330,11 +346,14 @@ class PaymentSuccessView(LoginRequiredMixin, TemplateView):
         session_id = self.request.GET.get("session_id", "")
         if order.payment_status != Order.PaymentStatus.PAID and session_id:
             checkout_data = verify_payment_callback(order.payment_provider, session_id=session_id)
-            if checkout_data and checkout_data.get("payment_status") == "paid":
-                mark_order_paid(order, provider=order.payment_provider, reference=session_id, payload=checkout_data)
+            if is_paid_checkout_session_for_order(order, checkout_data, session_id=session_id):
+                order = mark_order_paid(order, provider=order.payment_provider, reference=session_id, payload=checkout_data)
         context["order"] = order
         context["result_title"] = "支付结果"
-        context["result_message"] = "如果订单已经付款，系统会在几秒内完成自动发货。"
+        if order.payment_status == Order.PaymentStatus.PAID and order.status == Order.Status.FAILED:
+            context["result_message"] = "支付已经确认，但自动发货失败，商家会尽快处理。"
+        else:
+            context["result_message"] = "如果订单已经付款，系统会在几秒内完成自动发货。"
         return context
 
 
@@ -964,9 +983,11 @@ class DeliveryRecordRevealView(View):
 
         if request.user.is_authenticated:
             user = request.user
-            if not (user == order.user or user.is_staff or user.is_superuser or user.is_merchant):
+            if not (user == order.user or is_merchant_user(user)):
                 return JsonResponse({"ok": False, "message": "无权查看该发货内容。"}, status=403)
-            access_type = "merchant" if (user.is_staff or user.is_superuser or user.is_merchant) else "user"
+            if is_merchant_user(user) and not is_request_ip_allowed(request, settings.MERCHANT_ALLOWED_IPS):
+                return JsonResponse({"ok": False, "message": "当前 IP 无权查看该发货内容。"}, status=403)
+            access_type = "merchant" if is_merchant_user(user) else "user"
         else:
             token = request.POST.get("access_token", "").strip()
             if not token:
@@ -1033,7 +1054,7 @@ class StripeWebhookView(View):
             order_no = session.get("metadata", {}).get("order_no")
             if order_no:
                 order = Order.objects.filter(order_no=order_no).first()
-                if order and order.payment_status != Order.PaymentStatus.PAID:
+                if order and is_paid_checkout_session_for_order(order, session, session_id=session.get("id", "")):
                     mark_order_paid(order, provider="stripe", reference=session["id"], payload=session)
         return HttpResponse(status=200)
 

@@ -22,6 +22,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 ADMIN_ALLOWED_IPS = [ip.strip() for ip in os.getenv("ADMIN_ALLOWED_IPS", "").split(",") if ip.strip()]
 MERCHANT_ALLOWED_IPS = [ip.strip() for ip in os.getenv("MERCHANT_ALLOWED_IPS", "").split(",") if ip.strip()]
+TRUSTED_PROXY_IPS = [ip.strip() for ip in os.getenv("TRUSTED_PROXY_IPS", "").split(",") if ip.strip()]
 
 SITE_NAME = os.getenv("SITE_NAME", "web_0.0.1")
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "").strip().rstrip("/")
@@ -157,6 +158,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+WHITENOISE_USE_FINDERS = True
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

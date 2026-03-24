@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core import mail
 from django.templatetags.static import static
 from django.test import Client, TestCase, override_settings
@@ -94,6 +96,41 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(DeliveryRecord.objects.filter(order_item__order=order).count(), 1)
 
+    def test_anonymous_mock_payment_redirects_to_login(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        client.post(reverse("shop:create_order", args=[self.product.slug]), {"quantity": 1})
+        order = Order.objects.get(user=self.buyer)
+
+        client.logout()
+        response = client.get(reverse("shop:mock_pay", args=[order.order_no]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_mock_payment_with_out_of_stock_order_marks_failed_but_keeps_paid_status(self):
+        out_of_stock_product = Product.objects.create(
+            category=self.category,
+            title="Out of Stock Card",
+            slug="out-of-stock-card",
+            summary="无库存商品",
+            description="无库存商品详情",
+            face_value="15.00",
+            token_amount=1500000,
+            price="99.00",
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+            is_active=True,
+        )
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        order = create_single_item_order(self.buyer, out_of_stock_product, 1)
+
+        response = client.post(reverse("shop:mock_pay", args=[order.order_no]))
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(order.status, Order.Status.FAILED)
+        self.assertEqual(DeliveryRecord.objects.filter(order_item__order=order).count(), 0)
+
     def test_guest_order_lookup_works_with_order_number_and_email(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -182,6 +219,33 @@ class StoreOrderFlowTests(TestCase):
         self.assertContains(response, "USDT")
         self.assertContains(response, "银行卡转账")
 
+    def test_payment_success_requires_matching_paid_session_metadata(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        client.post(reverse("shop:create_order", args=[self.product.slug]), {"quantity": 1})
+        order = Order.objects.get(user=self.buyer)
+        order.payment_provider = "stripe"
+        order.save(update_fields=["payment_provider", "updated_at"])
+
+        with patch(
+            "shop.views.verify_payment_callback",
+            return_value={
+                "id": "cs_test_paid",
+                "payment_status": "paid",
+                "metadata": {"order_no": "OTHER-ORDER"},
+            },
+        ):
+            response = client.get(
+                reverse("shop:payment_success", args=[order.order_no]),
+                {"session_id": "cs_test_paid"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.UNPAID)
+        self.assertEqual(order.status, Order.Status.PENDING_PAYMENT)
+        self.assertEqual(DeliveryRecord.objects.filter(order_item__order=order).count(), 0)
+
     def test_authenticated_storefront_shows_account_center_entry(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -198,6 +262,13 @@ class StoreOrderFlowTests(TestCase):
         self.assertIn("wechat_pay", reserved_codes)
         self.assertIn("usdt", reserved_codes)
         self.assertIn("bank_transfer", reserved_codes)
+
+    def test_inactive_product_detail_returns_404(self):
+        self.product.is_active = False
+        self.product.save(update_fields=["is_active", "updated_at"])
+
+        response = self.client.get(reverse("shop:product_detail", args=[self.product.slug]))
+        self.assertEqual(response.status_code, 404)
 
 
 class MerchantDashboardTests(TestCase):
@@ -406,6 +477,16 @@ class MerchantOperationsTests(TestCase):
             ).exists()
         )
 
+    @override_settings(MERCHANT_ALLOWED_IPS=["10.0.0.1"])
+    def test_merchant_delivery_reveal_respects_ip_allowlist(self):
+        self.client.force_login(self.owner)
+        delivery = DeliveryRecord.objects.get(order_item__order=self.completed_order)
+        response = self.client.post(
+            reverse("shop:delivery_reveal", args=[self.completed_order.order_no, delivery.id]),
+            REMOTE_ADDR="127.0.0.1",
+        )
+        self.assertEqual(response.status_code, 403)
+
 
 class AccountCenterEnhancementTests(TestCase):
     def setUp(self):
@@ -479,6 +560,23 @@ class SecurityMiddlewareTests(TestCase):
         )
         self.client.force_login(owner)
         response = self.client.get(reverse("shop:merchant_dashboard"), REMOTE_ADDR="127.0.0.1")
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(MERCHANT_ALLOWED_IPS=["10.0.0.1"])
+    def test_merchant_ip_allowlist_ignores_untrusted_forwarded_for(self):
+        owner = User.objects.create_user(
+            username="owner-spoof",
+            password="ChangeMe123!",
+            email="owner-spoof@example.com",
+            is_staff=True,
+            is_merchant=True,
+        )
+        self.client.force_login(owner)
+        response = self.client.get(
+            reverse("shop:merchant_dashboard"),
+            REMOTE_ADDR="127.0.0.1",
+            HTTP_X_FORWARDED_FOR="10.0.0.1",
+        )
         self.assertEqual(response.status_code, 403)
 
 
