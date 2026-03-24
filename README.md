@@ -2,7 +2,7 @@
 
 ## 版本号
 
-当前版本：`0.0.8`
+当前版本：`0.0.9`
 
 ## 项目介绍
 
@@ -23,6 +23,7 @@
 - 已完成：商品、订单、库存卡密、发货记录、支付记录、公告、帮助文章等核心模型
 - 已完成：商家后台搜索、筛选、上下架、库存导入预览、导入历史、再次购买等功能
 - 已完成：卡密与发货内容应用层加密、敏感操作审计、后台可选 IP 白名单
+- 已完成：上线预检命令、就绪检查接口、本地服务器运行脚本、自动同步脚本
 - 当前状态：本地模拟支付可用，真实支付网关和真实供应 API 还未正式接入
 
 ## 如何使用
@@ -37,6 +38,12 @@ cp .env.example .env
 python manage.py migrate
 python manage.py seed_demo_store
 python manage.py runserver
+```
+
+上线前可执行预检：
+
+```bash
+python manage.py preflight_check
 ```
 
 ### 2. 默认访问地址
@@ -78,6 +85,12 @@ EMAIL_HOST_PASSWORD=your-app-password
 
 - 商品管理页标题区与筛选区重新分层，新增商品按钮位置更稳定
 - 全站字体栈与排版细节继续优化，按钮与导航可读性更好
+
+### 0.0.9
+
+- 新增上线预检命令和 `/health/readiness/` 接口
+- 新增 Docker / Compose 部署骨架
+- 新增本地服务器模式运行脚本、自动同步脚本和 Cloudflare Tunnel 配置骨架
 
 ### 0.0.7
 

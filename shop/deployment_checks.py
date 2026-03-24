@@ -1,0 +1,217 @@
+from dataclasses import asdict, dataclass
+
+from django.conf import settings
+from django.db import connections
+from django.db.migrations.executor import MigrationExecutor
+
+from shop.services.payment import list_active_payment_gateways
+
+
+LOCAL_EMAIL_BACKENDS = {
+    "django.core.mail.backends.console.EmailBackend",
+    "django.core.mail.backends.filebased.EmailBackend",
+    "django.core.mail.backends.locmem.EmailBackend",
+}
+
+
+@dataclass
+class ReadinessCheck:
+    key: str
+    label: str
+    status: str
+    detail: str
+    blocking: bool = False
+
+
+def _database_connection_check():
+    try:
+        connection = connections["default"]
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        return ReadinessCheck(
+            key="database_connection",
+            label="数据库连接",
+            status="pass",
+            detail=connection.settings_dict.get("ENGINE", ""),
+        )
+    except Exception as exc:
+        return ReadinessCheck(
+            key="database_connection",
+            label="数据库连接",
+            status="fail",
+            detail=str(exc),
+            blocking=True,
+        )
+
+
+def _migration_check():
+    connection = connections["default"]
+    try:
+        executor = MigrationExecutor(connection)
+        targets = executor.loader.graph.leaf_nodes()
+        plan = executor.migration_plan(targets)
+        if plan:
+            pending = [f"{migration.app_label}.{migration.name}" for migration, _ in plan]
+            return ReadinessCheck(
+                key="pending_migrations",
+                label="迁移状态",
+                status="fail",
+                detail="待执行迁移：" + ", ".join(pending[:8]),
+                blocking=True,
+            )
+        return ReadinessCheck(
+            key="pending_migrations",
+            label="迁移状态",
+            status="pass",
+            detail="所有迁移已执行",
+        )
+    except Exception as exc:
+        return ReadinessCheck(
+            key="pending_migrations",
+            label="迁移状态",
+            status="fail",
+            detail=str(exc),
+            blocking=True,
+        )
+
+
+def _debug_check():
+    if settings.DEBUG:
+        return ReadinessCheck(
+            key="debug_mode",
+            label="调试模式",
+            status="warn",
+            detail="DEBUG=True，仅适合本地或受控测试环境。",
+        )
+    return ReadinessCheck(
+        key="debug_mode",
+        label="调试模式",
+        status="pass",
+        detail="DEBUG=False",
+    )
+
+
+def _card_secret_check():
+    if settings.CARD_SECRET_KEY:
+        return ReadinessCheck(
+            key="card_secret_key",
+            label="卡密加密密钥",
+            status="pass",
+            detail="已配置独立 CARD_SECRET_KEY",
+        )
+    return ReadinessCheck(
+        key="card_secret_key",
+        label="卡密加密密钥",
+        status="warn",
+        detail="未配置独立 CARD_SECRET_KEY，当前回退到 DJANGO_SECRET_KEY。",
+    )
+
+
+def _site_base_url_check():
+    if settings.SITE_BASE_URL:
+        return ReadinessCheck(
+            key="site_base_url",
+            label="站点域名",
+            status="pass",
+            detail=settings.SITE_BASE_URL,
+        )
+    return ReadinessCheck(
+        key="site_base_url",
+        label="站点域名",
+        status="warn",
+        detail="SITE_BASE_URL 为空，邮件中的绝对链接将依赖当前请求域名。",
+    )
+
+
+def _email_check():
+    backend = settings.EMAIL_BACKEND
+    if backend in LOCAL_EMAIL_BACKENDS:
+        return ReadinessCheck(
+            key="email_backend",
+            label="邮件发送",
+            status="warn",
+            detail=f"当前邮件后端为本地调试模式：{backend}",
+        )
+    if settings.EMAIL_HOST and settings.EMAIL_HOST_USER:
+        return ReadinessCheck(
+            key="email_backend",
+            label="邮件发送",
+            status="pass",
+            detail=f"SMTP 已配置：{settings.EMAIL_HOST}",
+        )
+    return ReadinessCheck(
+        key="email_backend",
+        label="邮件发送",
+        status="warn",
+        detail="邮件后端已切到 SMTP，但关键配置仍不完整。",
+    )
+
+
+def _payment_gateway_check():
+    gateways = list_active_payment_gateways()
+    codes = [gateway.code for gateway in gateways]
+    non_mock = [code for code in codes if code != "mock"]
+    if non_mock:
+        return ReadinessCheck(
+            key="payment_gateways",
+            label="支付通道",
+            status="pass",
+            detail="已启用：" + ", ".join(non_mock),
+        )
+    if "mock" in codes:
+        return ReadinessCheck(
+            key="payment_gateways",
+            label="支付通道",
+            status="warn",
+            detail="当前只有 mock 支付，适合内部测试，不适合真实付款测试。",
+        )
+    return ReadinessCheck(
+        key="payment_gateways",
+        label="支付通道",
+        status="fail",
+        detail="没有任何可用支付通道。",
+        blocking=True,
+    )
+
+
+def _partner_api_check():
+    if settings.PARTNER_API_BASE_URL and settings.PARTNER_API_KEY:
+        return ReadinessCheck(
+            key="partner_api",
+            label="供货接口",
+            status="pass",
+            detail=settings.PARTNER_API_BASE_URL,
+        )
+    return ReadinessCheck(
+        key="partner_api",
+        label="供货接口",
+        status="warn",
+        detail="合作 API 未配置，当前会回退到 mock 供货。",
+    )
+
+
+def run_readiness_checks():
+    checks = [
+        _database_connection_check(),
+        _migration_check(),
+        _debug_check(),
+        _card_secret_check(),
+        _site_base_url_check(),
+        _email_check(),
+        _payment_gateway_check(),
+        _partner_api_check(),
+    ]
+
+    failed = [check for check in checks if check.status == "fail"]
+    warnings = [check for check in checks if check.status == "warn"]
+    passes = [check for check in checks if check.status == "pass"]
+    return {
+        "ok": not failed,
+        "internal_test_ready": not failed,
+        "external_user_test_ready": not failed and not warnings,
+        "failed_count": len(failed),
+        "warning_count": len(warnings),
+        "pass_count": len(passes),
+        "checks": [asdict(check) for check in checks],
+    }

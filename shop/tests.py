@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
+from shop.deployment_checks import run_readiness_checks
 from shop.models import (
     CardCode,
     DeliveryRecord,
@@ -465,6 +466,31 @@ class SecurityMiddlewareTests(TestCase):
         self.client.force_login(owner)
         response = self.client.get(reverse("shop:merchant_dashboard"), REMOTE_ADDR="127.0.0.1")
         self.assertEqual(response.status_code, 403)
+
+
+class ReadinessChecksTests(TestCase):
+    @override_settings(
+        DEBUG=False,
+        CARD_SECRET_KEY="test-card-secret",
+        SITE_BASE_URL="https://staging.example.com",
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="smtp.example.com",
+        EMAIL_HOST_USER="noreply@example.com",
+        PARTNER_API_BASE_URL="https://partner.example.com",
+        PARTNER_API_KEY="partner-token",
+        PAYMENT_ENABLE_MOCK_GATEWAY=False,
+        PAYMENT_ENABLE_STRIPE_GATEWAY=True,
+        STRIPE_SECRET_KEY="sk_test_123",
+    )
+    def test_readiness_checks_can_report_external_test_ready(self):
+        result = run_readiness_checks()
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["external_user_test_ready"])
+
+    def test_readiness_endpoint_returns_json(self):
+        response = self.client.get(reverse("shop:readiness"))
+        self.assertIn(response.status_code, (200, 503))
+        self.assertContains(response, "internal_test_ready")
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")

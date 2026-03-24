@@ -41,6 +41,7 @@ from .models import (
     SupportTicket,
     SupportTicketMessage,
 )
+from .deployment_checks import run_readiness_checks
 from .security import build_guest_order_access_token, load_guest_order_access_token, mask_secret
 from .services.order_flow import create_single_item_order, mark_order_paid
 from .services.payment import (
@@ -1040,3 +1041,10 @@ class StripeWebhookView(View):
 class HealthView(View):
     def get(self, request, *args, **kwargs):
         return JsonResponse({"ok": True, "service": "web_0.0.1"})
+
+
+class ReadinessView(View):
+    def get(self, request, *args, **kwargs):
+        result = run_readiness_checks()
+        status = 200 if result["ok"] else 503
+        return JsonResponse(result, status=status)

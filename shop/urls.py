@@ -27,6 +27,7 @@ from .views import (
     PaymentCancelView,
     PaymentSuccessView,
     ProductDetailView,
+    ReadinessView,
     ReorderView,
     StartPaymentView,
     StorefrontView,
@@ -38,6 +39,7 @@ from .views import (
 urlpatterns = [
     path("", StorefrontView.as_view(), name="storefront"),
     path("health/", HealthView.as_view(), name="health"),
+    path("health/readiness/", ReadinessView.as_view(), name="readiness"),
     path("announcements/<int:pk>/", AnnouncementDetailView.as_view(), name="announcement_detail"),
     path("help/", HelpCenterView.as_view(), name="help_center"),
     path("help/<slug:slug>/", HelpArticleDetailView.as_view(), name="help_article_detail"),

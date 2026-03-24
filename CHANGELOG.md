@@ -2,6 +2,28 @@
 
 本文件记录项目的可见版本变更。
 
+## 0.0.9 - 2026-03-24
+
+### Added
+
+- 上线预检命令 `preflight_check`
+- `/health/readiness/` 就绪检查接口
+- Docker / Compose 部署骨架
+- 本地服务器模式下的 Waitress Windows 服务脚本
+- GitHub 自动拉取并重启部署脚本
+- Cloudflare Tunnel 服务配置骨架
+
+### Changed
+
+- 本机运行环境补齐并同步到最新数据库迁移
+- 本地服务改为可长期运行的 Windows 服务模式
+
+### Verified
+
+- `manage.py check`
+- `manage.py test accounts shop`
+- 本地首页与就绪接口访问正常
+
 ## 0.0.8 - 2026-03-24
 
 ### Changed
