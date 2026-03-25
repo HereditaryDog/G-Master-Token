@@ -1816,9 +1816,9 @@ body::after {
 .page-shell {
     position: relative;
     z-index: 1;
-    width: min(1380px, calc(100% - clamp(18px, 4vw, 44px)));
-    gap: 22px;
-    padding: clamp(16px, 2vw, 22px) 0 clamp(40px, 5vw, 62px);
+    width: min(1180px, calc(100% - clamp(18px, 4vw, 44px)));
+    gap: 32px;
+    padding: clamp(8px, 1.2vw, 12px) 0 clamp(40px, 5vw, 62px);
 }
 
 .page-main {
@@ -1831,16 +1831,16 @@ body::after {
 
 .site-header {
     position: sticky;
-    top: 16px;
+    top: 0;
     z-index: 30;
-    margin-bottom: 0;
+    margin-bottom: 10px;
 }
 
 .site-header--dense {
     position: relative;
     overflow: hidden;
     padding: 20px 24px;
-    border-radius: 34px;
+    border-radius: 0 0 34px 34px;
     background: rgba(255, 248, 239, 0.72);
     border: 1px solid rgba(255, 255, 255, 0.62);
     box-shadow: var(--shadow-strong);
@@ -1937,7 +1937,7 @@ body::after {
 .support-ticket-row,
 .support-message,
 .order-summary-card {
-    border-radius: 32px;
+    border-radius: 40px;
     border: 1px solid rgba(255, 255, 255, 0.72);
     background: var(--surface);
     box-shadow: var(--shadow);
@@ -2753,7 +2753,7 @@ tbody tr:hover td {
 }
 
 .product-card__visual-copy--glass {
-    min-width: min(100%, 330px);
+    min-width: min(100%, 240px);
     gap: 10px;
     padding: 14px 16px;
     border-radius: 24px;
@@ -2998,7 +2998,8 @@ tbody tr:hover td {
 
 body {
     font-optical-sizing: auto;
-    letter-spacing: -0.004em;
+    font-size: 14px;
+    letter-spacing: 0.011em;
 }
 
 .eyebrow {
@@ -3041,6 +3042,13 @@ body {
     line-height: 0.98;
     letter-spacing: -0.042em;
     word-spacing: 0.04em;
+}
+
+.apple-hero h1,
+.detail-copy h1,
+.auth-card h1,
+.content-card h1 {
+    font-size: clamp(3rem, 7.5vw, 6.5rem);
 }
 
 .apple-hero h1,
@@ -3118,145 +3126,5 @@ body {
     .auth-card h1,
     .content-card h1 {
         max-width: none;
-    }
-}
-
-/* Local UI debug controls */
-
-:root {
-    --ui-page-width: 1380px;
-    --ui-body-font-size: 16px;
-    --ui-body-letter-spacing: -0.004em;
-    --ui-hero-title-scale: 1;
-    --ui-card-overlay-width: 330px;
-    --ui-surface-radius: 32px;
-}
-
-body {
-    font-size: var(--ui-body-font-size);
-    letter-spacing: var(--ui-body-letter-spacing);
-}
-
-.page-shell {
-    width: min(var(--ui-page-width), calc(100% - clamp(18px, 4vw, 44px)));
-}
-
-.apple-hero,
-.content-card,
-.auth-card,
-.metric-card,
-.product-card,
-.detail-panel,
-.detail-visual,
-.merchant-sidebar,
-.support-ticket-card,
-.support-ticket-row,
-.support-message,
-.order-summary-card {
-    border-radius: var(--ui-surface-radius);
-}
-
-.site-header--dense,
-.merchant-console-hero,
-.site-footer {
-    border-radius: calc(var(--ui-surface-radius) + 2px);
-}
-
-.apple-hero h1,
-.detail-copy h1,
-.auth-card h1,
-.content-card h1 {
-    font-size: clamp(
-        calc(2.4rem * var(--ui-hero-title-scale)),
-        calc(6vw * var(--ui-hero-title-scale)),
-        calc(5.2rem * var(--ui-hero-title-scale))
-    );
-}
-
-.product-card__visual-copy--glass {
-    min-width: min(100%, var(--ui-card-overlay-width));
-}
-
-.ui-debug-panel {
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 60;
-    width: min(320px, calc(100vw - 24px));
-    border-radius: 22px;
-    background: rgba(15, 26, 31, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 24px 48px rgba(8, 18, 24, 0.28);
-    backdrop-filter: blur(18px);
-    color: #f7f2ea;
-    overflow: hidden;
-}
-
-.ui-debug-panel summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 14px 16px;
-    font-size: 0.95rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-}
-
-.ui-debug-panel summary::-webkit-details-marker {
-    display: none;
-}
-
-.ui-debug-panel__body {
-    display: grid;
-    gap: 14px;
-    padding: 0 16px 16px;
-}
-
-.ui-debug-panel__note {
-    margin: 0;
-    color: rgba(244, 237, 226, 0.7);
-    font-size: 0.84rem;
-    line-height: 1.55;
-}
-
-.ui-debug-control {
-    display: grid;
-    gap: 8px;
-}
-
-.ui-debug-control > span {
-    font-size: 0.88rem;
-    font-weight: 700;
-    letter-spacing: -0.014em;
-}
-
-.ui-debug-control__row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    align-items: center;
-}
-
-.ui-debug-control input[type="range"] {
-    width: 100%;
-    accent-color: var(--accent);
-}
-
-.ui-debug-control output {
-    min-width: 72px;
-    color: rgba(244, 237, 226, 0.88);
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    text-align: right;
-}
-
-.ui-debug-panel__reset {
-    width: 100%;
-}
-
-@media (max-width: 760px) {
-    .ui-debug-panel {
-        right: 12px;
-        bottom: 12px;
-        width: min(100vw - 24px, 320px);
     }
 }

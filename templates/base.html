@@ -9,7 +9,51 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+    <link rel="stylesheet" href="{% static 'css/site.css' %}?v={{ asset_version }}">
+    <style id="ui-final-overrides">
+        body {
+            font-size: 14px;
+            letter-spacing: 0.011em;
+        }
+
+        .page-shell {
+            width: min(1180px, calc(100% - clamp(18px, 4vw, 44px)));
+        }
+
+        .apple-hero,
+        .content-card,
+        .auth-card,
+        .metric-card,
+        .product-card,
+        .detail-panel,
+        .detail-visual,
+        .merchant-sidebar,
+        .feature-panel,
+        .notice-row,
+        .support-ticket-card,
+        .support-ticket-row,
+        .support-message,
+        .order-summary-card {
+            border-radius: 40px;
+        }
+
+        .site-header--dense,
+        .merchant-console-hero,
+        .site-footer {
+            border-radius: 42px;
+        }
+
+        .apple-hero h1,
+        .detail-copy h1,
+        .auth-card h1,
+        .content-card h1 {
+            font-size: clamp(3rem, 7.5vw, 6.5rem);
+        }
+
+        .product-card__visual-copy--glass {
+            min-width: min(100%, 240px);
+        }
+    </style>
 </head>
 <body>
     <div class="page-shell">
@@ -55,65 +99,6 @@
             {% block content %}{% endblock %}
         </main>
 
-        {% if ui_debug_enabled %}
-            <details class="ui-debug-panel">
-                <summary>UI 调试</summary>
-                <div class="ui-debug-panel__body">
-                    <p class="ui-debug-panel__note">仅本地开发环境可见，调节结果会保存在当前浏览器。</p>
-
-                    <label class="ui-debug-control">
-                        <span>页面宽度</span>
-                        <div class="ui-debug-control__row">
-                            <input type="range" min="1180" max="1480" step="10" value="1380" data-ui-var="--ui-page-width" data-ui-unit="px" data-ui-default="1380">
-                            <output>1380px</output>
-                        </div>
-                    </label>
-
-                    <label class="ui-debug-control">
-                        <span>正文字号</span>
-                        <div class="ui-debug-control__row">
-                            <input type="range" min="14" max="18" step="0.1" value="16" data-ui-var="--ui-body-font-size" data-ui-unit="px" data-ui-default="16">
-                            <output>16px</output>
-                        </div>
-                    </label>
-
-                    <label class="ui-debug-control">
-                        <span>字间距</span>
-                        <div class="ui-debug-control__row">
-                            <input type="range" min="-0.02" max="0.02" step="0.001" value="-0.004" data-ui-var="--ui-body-letter-spacing" data-ui-unit="em" data-ui-default="-0.004">
-                            <output>-0.004em</output>
-                        </div>
-                    </label>
-
-                    <label class="ui-debug-control">
-                        <span>Hero 标题比例</span>
-                        <div class="ui-debug-control__row">
-                            <input type="range" min="0.8" max="1.25" step="0.01" value="1" data-ui-var="--ui-hero-title-scale" data-ui-default="1">
-                            <output>1</output>
-                        </div>
-                    </label>
-
-                    <label class="ui-debug-control">
-                        <span>商品浮层宽度</span>
-                        <div class="ui-debug-control__row">
-                            <input type="range" min="240" max="400" step="4" value="330" data-ui-var="--ui-card-overlay-width" data-ui-unit="px" data-ui-default="330">
-                            <output>330px</output>
-                        </div>
-                    </label>
-
-                    <label class="ui-debug-control">
-                        <span>卡片圆角</span>
-                        <div class="ui-debug-control__row">
-                            <input type="range" min="18" max="40" step="1" value="32" data-ui-var="--ui-surface-radius" data-ui-unit="px" data-ui-default="32">
-                            <output>32px</output>
-                        </div>
-                    </label>
-
-                    <button type="button" class="ghost-button ui-debug-panel__reset">重置调试值</button>
-                </div>
-            </details>
-        {% endif %}
-
         <footer class="site-footer">
             <div class="site-footer__grid">
                 <div class="site-footer__brand">
@@ -149,74 +134,5 @@
             </div>
         </footer>
     </div>
-
-    {% if ui_debug_enabled %}
-        <script>
-        (function () {
-            const storageKey = "gmaster-ui-debug";
-            const panel = document.querySelector(".ui-debug-panel");
-            if (!panel) return;
-
-            const inputs = Array.from(panel.querySelectorAll("input[data-ui-var]"));
-            const resetButton = panel.querySelector(".ui-debug-panel__reset");
-            const rootStyle = document.documentElement.style;
-
-            function formatValue(value, unit) {
-                return `${value}${unit || ""}`;
-            }
-
-            function updateOutput(input) {
-                const output = input.parentElement.querySelector("output");
-                if (output) {
-                    output.textContent = formatValue(input.value, input.dataset.uiUnit || "");
-                }
-            }
-
-            function applyInput(input) {
-                rootStyle.setProperty(input.dataset.uiVar, formatValue(input.value, input.dataset.uiUnit || ""));
-                updateOutput(input);
-            }
-
-            function loadState() {
-                try {
-                    return JSON.parse(localStorage.getItem(storageKey) || "{}");
-                } catch (error) {
-                    return {};
-                }
-            }
-
-            function saveState() {
-                const payload = {};
-                inputs.forEach((input) => {
-                    payload[input.dataset.uiVar] = input.value;
-                });
-                localStorage.setItem(storageKey, JSON.stringify(payload));
-            }
-
-            const savedState = loadState();
-            inputs.forEach((input) => {
-                const savedValue = savedState[input.dataset.uiVar];
-                if (savedValue !== undefined) {
-                    input.value = savedValue;
-                }
-                applyInput(input);
-                input.addEventListener("input", function () {
-                    applyInput(input);
-                    saveState();
-                });
-            });
-
-            if (resetButton) {
-                resetButton.addEventListener("click", function () {
-                    inputs.forEach((input) => {
-                        input.value = input.dataset.uiDefault || input.defaultValue;
-                        applyInput(input);
-                    });
-                    localStorage.removeItem(storageKey);
-                });
-            }
-        })();
-        </script>
-    {% endif %}
 </body>
 </html>
