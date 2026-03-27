@@ -11,3 +11,4 @@ runserver.err.log
 logs/
 .venv-service/
 .codex-backups/
+output/playwright/

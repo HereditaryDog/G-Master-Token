@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core import mail
 from django.contrib.auth.tokens import default_token_generator
 from django.test import Client, TestCase, override_settings
@@ -237,7 +238,7 @@ class AccountAuthFlowTests(TestCase):
     def test_login_page_uses_configured_site_name(self):
         response = self.client.get(reverse("accounts:login"), HTTP_HOST="127.0.0.1:8000")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "G-Master发卡网")
+        self.assertContains(response, settings.SITE_NAME)
 
     def test_login_page_contains_password_reset_link(self):
         response = self.client.get(reverse("accounts:login"))

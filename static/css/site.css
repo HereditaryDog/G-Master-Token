@@ -1986,13 +1986,55 @@ body::after {
     max-width: 12ch;
 }
 
-.apple-hero .hero-actions {
-    justify-content: start;
+.hero-control-stack {
+    display: grid;
+    gap: 14px;
+    width: min(620px, 100%);
+    margin-top: 12px;
 }
 
-.apple-hero .search-bar--hero {
-    width: min(760px, 100%);
-    margin: 4px 0 0;
+.hero-actions--hero {
+    justify-content: start;
+    gap: 12px;
+    width: fit-content;
+}
+
+.hero-actions--hero.hero-actions--center {
+    margin: 0;
+}
+
+.hero-actions--hero .primary-button,
+.hero-actions--hero .ghost-button {
+    min-height: 52px;
+    padding: 0 26px;
+    border-radius: 28px;
+    font-size: 0.96rem;
+    letter-spacing: -0.014em;
+    white-space: nowrap;
+}
+
+.hero-search-bar {
+    width: 100%;
+    margin: 0;
+    gap: 12px;
+    align-items: center;
+}
+
+.hero-search-bar input {
+    min-height: 58px;
+    padding: 0 22px;
+    border-radius: 24px;
+    font-size: 0.96rem;
+}
+
+.hero-search-bar .primary-button {
+    min-height: 52px;
+    min-width: 104px;
+    padding: 0 24px;
+    border-radius: 24px;
+    align-self: center;
+    font-size: 0.95rem;
+    letter-spacing: -0.014em;
 }
 
 .eyebrow {
@@ -2506,9 +2548,30 @@ tbody tr:hover td {
         text-align: left;
     }
 
-    .apple-hero .hero-actions {
+    .hero-control-stack {
+        width: 100%;
+    }
+
+    .hero-actions--hero {
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-auto-flow: row;
         justify-content: stretch;
+    }
+
+    .hero-actions--hero .primary-button,
+    .hero-actions--hero .ghost-button {
+        width: 100%;
+        padding: 0 20px;
+    }
+
+    .hero-search-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-search-bar .primary-button {
+        width: 100%;
+        min-width: 0;
     }
 
     .search-bar,

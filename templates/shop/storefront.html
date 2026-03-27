@@ -9,14 +9,16 @@
         <div class="apple-hero__grid">
             <div class="apple-hero__main">
                 <h1>{{ site_name }}</h1>
-                <div class="hero-actions hero-actions--center">
-                    <a class="primary-button" href="#products">浏览商品</a>
-                    <a class="ghost-button" href="{% url 'shop:order_lookup' %}">订单查询</a>
+                <div class="hero-control-stack">
+                    <div class="hero-actions hero-actions--center hero-actions--hero">
+                        <a class="primary-button" href="#products">浏览商品</a>
+                        <a class="ghost-button" href="{% url 'shop:order_lookup' %}">订单查询</a>
+                    </div>
+                    <form method="get" class="search-bar search-bar--hero hero-search-bar">
+                        <input type="text" name="q" value="{{ keyword }}" placeholder="搜索商品名称、摘要或关键词">
+                        <button type="submit" class="primary-button">搜索</button>
+                    </form>
                 </div>
-                <form method="get" class="search-bar search-bar--hero">
-                    <input type="text" name="q" value="{{ keyword }}" placeholder="搜索商品名称、摘要或关键词">
-                    <button type="submit" class="primary-button">搜索</button>
-                </form>
             </div>
             <aside class="hero-spotlight hero-spotlight--brand">
                 <div class="hero-brand-frame">
