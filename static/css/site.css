@@ -704,6 +704,13 @@ select {
     cursor: default;
 }
 
+.captcha-box__image {
+    display: block;
+    width: 96px;
+    height: 42px;
+    border-radius: 12px;
+}
+
 .payment-ticket,
 .notice-card,
 .delivery-block,
@@ -3214,6 +3221,16 @@ body {
 
 .apple-hero__main h1 {
     max-width: 7ch;
+}
+
+.hero-title {
+    display: grid;
+    gap: 0.04em;
+    max-width: none;
+}
+
+.hero-title__line {
+    display: block;
 }
 
 .hero-spotlight h3,

@@ -1,4 +1,5 @@
 import logging
+import time
 
 from django.contrib.auth import login
 from django.contrib.auth.views import (
@@ -12,8 +13,8 @@ from django.contrib.auth.views import (
 )
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
-from django.urls import reverse_lazy
+from django.http import HttpResponse, JsonResponse
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import CreateView
 
@@ -26,13 +27,14 @@ from .forms import (
     SignUpForm,
 )
 from .models import User
+from .rate_limits import consume_request
 from .utils import (
     build_signup_code_response_payload,
-    get_login_captcha,
-    normalize_email_address,
     refresh_login_captcha,
+    normalize_email_address,
     send_signup_email_code,
 )
+from shop.security import get_request_ip
 
 logger = logging.getLogger(__name__)
 
@@ -48,46 +50,25 @@ class SignUpView(CreateView):
         return response
 
 
-class AccountLoginView(LoginView):
+class CaptchaLoginViewMixin:
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["site_name"] = settings.SITE_NAME
+        context["project_version"] = settings.PROJECT_VERSION
+        context["captcha_image_url"] = f"{reverse('accounts:login_captcha')}?ts={time.time_ns()}"
+        return context
+
+
+class AccountLoginView(CaptchaLoginViewMixin, LoginView):
     template_name = "registration/login.html"
     authentication_form = AccountLoginForm
     redirect_authenticated_user = True
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["site_name"] = settings.SITE_NAME
-        context["project_version"] = settings.PROJECT_VERSION
-        context["captcha_value"] = get_login_captcha(self.request)
-        return context
 
-    def form_invalid(self, form):
-        refresh_login_captcha(self.request)
-        return super().form_invalid(form)
-
-    def get(self, request, *args, **kwargs):
-        refresh_login_captcha(request)
-        return super().get(request, *args, **kwargs)
-
-
-class MerchantLoginView(LoginView):
+class MerchantLoginView(CaptchaLoginViewMixin, LoginView):
     template_name = "registration/merchant_login.html"
     authentication_form = MerchantLoginForm
     redirect_authenticated_user = True
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["site_name"] = settings.SITE_NAME
-        context["project_version"] = settings.PROJECT_VERSION
-        context["captcha_value"] = get_login_captcha(self.request)
-        return context
-
-    def form_invalid(self, form):
-        refresh_login_captcha(self.request)
-        return super().form_invalid(form)
-
-    def get(self, request, *args, **kwargs):
-        refresh_login_captcha(request)
-        return super().get(request, *args, **kwargs)
 
     def get_success_url(self):
         return self.get_redirect_url() or reverse_lazy("shop:merchant_dashboard")
@@ -137,6 +118,18 @@ class AccountPasswordChangeDoneView(PasswordChangeDoneView):
 
 class SendSignupCodeView(View):
     def post(self, request, *args, **kwargs):
+        request_ip = get_request_ip(request)
+        ip_decision = consume_request("signup_code_ip", request_ip)
+        if ip_decision.blocked:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "message": ip_decision.message,
+                    "cooldown_seconds": ip_decision.retry_after,
+                },
+                status=429,
+            )
+
         email = request.POST.get("email", "")
         if not email:
             return JsonResponse({"ok": False, "message": "请先输入邮箱地址。"}, status=400)
@@ -144,6 +137,16 @@ class SendSignupCodeView(View):
             email = normalize_email_address(email)
         except ValidationError:
             return JsonResponse({"ok": False, "message": "请输入有效的邮箱地址。"}, status=400)
+        email_decision = consume_request("signup_code_email", email)
+        if email_decision.blocked:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "message": email_decision.message,
+                    "cooldown_seconds": email_decision.retry_after,
+                },
+                status=429,
+            )
         if User.objects.filter(email__iexact=email).exists():
             return JsonResponse({"ok": False, "message": "该邮箱已经注册。"}, status=400)
         try:
@@ -165,4 +168,8 @@ class SendSignupCodeView(View):
 
 class RefreshLoginCaptchaView(View):
     def get(self, request, *args, **kwargs):
-        return JsonResponse({"ok": True, "captcha": refresh_login_captcha(request)})
+        svg = refresh_login_captcha(request)
+        response = HttpResponse(svg, content_type="image/svg+xml")
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response

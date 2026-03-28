@@ -65,6 +65,7 @@ from .services.payment import (
     PaymentGatewayUnavailable,
     verify_payment_callback,
 )
+from accounts.rate_limits import consume_request
 
 
 def collect_delivery_codes(order):
@@ -382,6 +383,7 @@ class GuestOrderLookupView(FormView):
     template_name = "shop/order_lookup.html"
     form_class = GuestOrderLookupForm
     success_url = reverse_lazy("shop:order_lookup")
+    not_found_message = "查询条件不匹配，请检查后重试。"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -390,6 +392,11 @@ class GuestOrderLookupView(FormView):
         return context
 
     def form_valid(self, form):
+        ip_decision = consume_request("order_lookup_ip", get_request_ip(self.request))
+        if ip_decision.blocked:
+            form.add_error(None, ip_decision.message)
+            return self.form_invalid(form)
+
         order_no = form.cleaned_data["order_no"].strip()
         email = form.cleaned_data["email"].strip().lower()
         order = (
@@ -400,7 +407,7 @@ class GuestOrderLookupView(FormView):
             .first()
         )
         if not order:
-            form.add_error(None, "没有找到匹配的订单，请检查订单号和邮箱。")
+            form.add_error(None, self.not_found_message)
             return self.form_invalid(form)
         access_token = build_guest_order_access_token(order, email)
         return self.render_to_response(self.get_context_data(form=form, order=order, guest_access_token=access_token))

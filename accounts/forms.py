@@ -10,6 +10,8 @@ from django.contrib.auth.forms import (
 from django.utils import timezone
 
 from .models import EmailVerificationCode, User
+from .rate_limits import build_login_throttle_scopes, clear_login_failures, get_throttle_status, register_failure
+from .utils import validate_login_captcha
 
 
 class SignUpForm(UserCreationForm):
@@ -78,32 +80,59 @@ class AccountLoginForm(AuthenticationForm):
         "inactive": "该账号已被停用。",
         "merchant_account": "商家账号请前往商家登录页。",
         "non_merchant_account": "该账号不是商家账号，请使用普通用户登录页。",
+        "throttled": "登录失败次数过多，请稍后再试。",
     }
+
+    throttle_scope_prefix = "login"
 
     def __init__(self, request=None, *args, **kwargs):
         super().__init__(request=request, *args, **kwargs)
         self.fields["username"].widget.attrs.update({"placeholder": "用户名或邮箱地址"})
         self.fields["captcha"].widget.attrs.update({"placeholder": "输入图形验证码"})
 
-    def clean_captcha(self):
-        captcha = self.cleaned_data["captcha"].strip().upper()
-        expected = (self.request.session.get("login_captcha") or "").upper()
-        if not captcha or captcha != expected:
-            raise forms.ValidationError(self.error_messages["invalid_captcha"])
-        return captcha
+    def _current_login_value(self):
+        return (self.data.get("username", "") or "").strip()
+
+    def _ensure_not_throttled(self):
+        for scope, bucket in build_login_throttle_scopes(self.throttle_scope_prefix, self.request, self._current_login_value()):
+            decision = get_throttle_status(scope, bucket)
+            if decision.blocked:
+                raise forms.ValidationError(self.error_messages["throttled"], code="throttled")
+
+    def _record_failed_attempt(self):
+        for scope, bucket in build_login_throttle_scopes(self.throttle_scope_prefix, self.request, self._current_login_value()):
+            register_failure(scope, bucket)
+
+    def _clear_failed_attempts(self, user):
+        clear_login_failures(self.throttle_scope_prefix, self.request, self._current_login_value(), user=user)
 
     def clean(self):
-        cleaned_data = super().clean()
+        cleaned_data = self.cleaned_data
         username = cleaned_data.get("username")
         password = cleaned_data.get("password")
-        if username and password:
-            self.user_cache = authenticate(self.request, username=username, password=password)
-            if self.user_cache is None:
-                raise forms.ValidationError(
-                    self.error_messages["invalid_login"],
-                    code="invalid_login",
-                )
+        captcha = cleaned_data.get("captcha")
+        if not username or not password or not captcha:
+            return cleaned_data
+
+        self._ensure_not_throttled()
+
+        if not validate_login_captcha(self.request, captcha):
+            self._record_failed_attempt()
+            raise forms.ValidationError(self.error_messages["invalid_captcha"], code="invalid_captcha")
+
+        self.user_cache = authenticate(self.request, username=username, password=password)
+        if self.user_cache is None:
+            self._record_failed_attempt()
+            raise forms.ValidationError(
+                self.error_messages["invalid_login"],
+                code="invalid_login",
+            )
+        try:
             self.confirm_login_allowed(self.user_cache)
+        except forms.ValidationError:
+            self._record_failed_attempt()
+            raise
+        self._clear_failed_attempts(self.user_cache)
         return cleaned_data
 
     def confirm_login_allowed(self, user):
@@ -116,6 +145,12 @@ class AccountLoginForm(AuthenticationForm):
 
 
 class MerchantLoginForm(AccountLoginForm):
+    throttle_scope_prefix = "merchant_login"
+    error_messages = {
+        **AccountLoginForm.error_messages,
+        "throttled": "商家登录失败次数过多，请稍后再试。",
+    }
+
     def confirm_login_allowed(self, user):
         AuthenticationForm.confirm_login_allowed(self, user)
         if not (user.is_staff or user.is_superuser or user.is_merchant):

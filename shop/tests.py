@@ -167,6 +167,33 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, order.order_no)
 
+    def test_guest_order_lookup_uses_generic_error_message_for_mismatch(self):
+        response = self.client.post(
+            reverse("shop:order_lookup"),
+            {"order_no": "OD-UNKNOWN", "email": "missing@example.com"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "查询条件不匹配，请检查后重试。")
+        self.assertNotContains(response, "没有找到匹配的订单")
+
+    @override_settings(
+        SECURITY_THROTTLE_POLICIES={
+            "order_lookup_ip": {"window_seconds": 600, "max_attempts": 2, "cooldown_seconds": 600},
+        }
+    )
+    def test_guest_order_lookup_rate_limits_by_ip(self):
+        first = self.client.post(
+            reverse("shop:order_lookup"),
+            {"order_no": "OD-NOPE-1", "email": "missing@example.com"},
+        )
+        second = self.client.post(
+            reverse("shop:order_lookup"),
+            {"order_no": "OD-NOPE-2", "email": "missing@example.com"},
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "查询过于频繁，请稍后再试。")
+
     def test_guest_order_lookup_masks_delivery_codes_in_initial_html(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))

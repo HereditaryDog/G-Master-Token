@@ -11,7 +11,13 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
 from .models import EmailVerificationCode, User
-from .utils import build_signup_code_response_payload
+from .utils import build_signup_code_response_payload, prime_login_captcha
+
+
+def prime_client_captcha(client, answer):
+    session = client.session
+    prime_login_captcha(session, answer)
+    session.save()
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
@@ -39,13 +45,13 @@ class AccountAuthFlowTests(TestCase):
         self.assertFalse(EmailVerificationCode.objects.filter(email="not-an-email").exists())
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend", DEBUG=True)
-    def test_send_signup_code_returns_debug_code_for_local_mail_backend(self):
+    def test_send_signup_code_never_returns_plaintext_code_for_local_mail_backend(self):
         response = self.client.post(reverse("accounts:signup_send_code"), {"email": "debug@example.com"})
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["delivery_mode"], "debug")
-        self.assertIn("debug_code", payload)
-        self.assertIn("本地调试模式", payload["message"])
+        self.assertEqual(payload["delivery_mode"], "local_mail")
+        self.assertNotIn("debug_code", payload)
+        self.assertIn("本地邮件输出", payload["message"])
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", DEBUG=True)
     def test_send_signup_code_hides_debug_code_for_real_mail_backend(self):
@@ -59,6 +65,32 @@ class AccountAuthFlowTests(TestCase):
         self.assertEqual(payload["delivery_mode"], "email")
         self.assertNotIn("debug_code", payload)
         self.assertEqual(payload["message"], "验证码已发送，请查收邮箱。")
+
+    @override_settings(
+        SECURITY_THROTTLE_POLICIES={
+            "signup_code_email": {"window_seconds": 600, "max_attempts": 2, "cooldown_seconds": 600},
+            "signup_code_ip": {"window_seconds": 600, "max_attempts": 10, "cooldown_seconds": 600},
+        }
+    )
+    def test_send_signup_code_rate_limits_same_email(self):
+        first = self.client.post(reverse("accounts:signup_send_code"), {"email": "same@example.com"})
+        second = self.client.post(reverse("accounts:signup_send_code"), {"email": "same@example.com"})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertIn("频繁", second.json()["message"])
+
+    @override_settings(
+        SECURITY_THROTTLE_POLICIES={
+            "signup_code_email": {"window_seconds": 600, "max_attempts": 10, "cooldown_seconds": 600},
+            "signup_code_ip": {"window_seconds": 600, "max_attempts": 2, "cooldown_seconds": 600},
+        }
+    )
+    def test_send_signup_code_rate_limits_same_ip(self):
+        first = self.client.post(reverse("accounts:signup_send_code"), {"email": "one@example.com"})
+        second = self.client.post(reverse("accounts:signup_send_code"), {"email": "two@example.com"})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertIn("频繁", second.json()["message"])
 
     @patch("accounts.utils.send_mail", side_effect=RuntimeError("smtp unavailable"))
     def test_send_signup_code_cleans_up_record_when_delivery_fails(self, mock_send_mail):
@@ -126,9 +158,7 @@ class AccountAuthFlowTests(TestCase):
         self.assertIsNotNone(user.pk)
 
         client = Client()
-        session = client.session
-        session["login_captcha"] = "AB12"
-        session.save()
+        prime_client_captcha(client, "AB12")
 
         username_response = client.post(
             reverse("accounts:login"),
@@ -137,9 +167,7 @@ class AccountAuthFlowTests(TestCase):
         self.assertEqual(username_response.status_code, 302)
 
         client.logout()
-        session = client.session
-        session["login_captcha"] = "CD34"
-        session.save()
+        prime_client_captcha(client, "CD34")
 
         email_response = client.post(
             reverse("accounts:login"),
@@ -157,9 +185,7 @@ class AccountAuthFlowTests(TestCase):
             is_merchant=True,
         )
         client = Client()
-        session = client.session
-        session["login_captcha"] = "AB12"
-        session.save()
+        prime_client_captcha(client, "AB12")
 
         response = client.post(
             reverse("accounts:login"),
@@ -177,9 +203,7 @@ class AccountAuthFlowTests(TestCase):
             email_verified=True,
         )
         client = Client()
-        session = client.session
-        session["login_captcha"] = "EF56"
-        session.save()
+        prime_client_captcha(client, "EF56")
 
         response = client.post(
             reverse("accounts:merchant_login"),
@@ -198,9 +222,7 @@ class AccountAuthFlowTests(TestCase):
             is_merchant=True,
         )
         client = Client()
-        session = client.session
-        session["login_captcha"] = "GH78"
-        session.save()
+        prime_client_captcha(client, "GH78")
 
         response = client.post(
             reverse("accounts:merchant_login"),
@@ -218,9 +240,7 @@ class AccountAuthFlowTests(TestCase):
             email_verified=True,
         )
         client = Client()
-        session = client.session
-        session["login_captcha"] = "WXYZ"
-        session.save()
+        prime_client_captcha(client, "WXYZ")
 
         response = client.post(
             reverse("accounts:login"),
@@ -229,11 +249,72 @@ class AccountAuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "验证码不正确")
 
-    def test_login_captcha_refresh_endpoint_returns_new_code(self):
+    def test_login_captcha_refresh_endpoint_returns_svg_image(self):
         client = Client()
         response = client.get(reverse("accounts:login_captcha"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "captcha")
+        self.assertEqual(response["Content-Type"], "image/svg+xml")
+        self.assertContains(response, "<svg")
+
+    @override_settings(
+        SECURITY_THROTTLE_POLICIES={
+            "login_ip": {"window_seconds": 600, "max_attempts": 2, "cooldown_seconds": 600},
+            "login_account": {"window_seconds": 600, "max_attempts": 2, "cooldown_seconds": 600},
+        }
+    )
+    def test_login_rate_limits_after_repeated_failures(self):
+        User.objects.create_user(
+            username="rate-user",
+            email="rate@example.com",
+            phone="13800138007",
+            password="Correct123!",
+            email_verified=True,
+        )
+        client = Client()
+        for answer in ("AA11", "BB22"):
+            prime_client_captcha(client, answer)
+            response = client.post(
+                reverse("accounts:login"),
+                {"username": "rate-user", "password": "WrongPass123!", "captcha": answer},
+            )
+            self.assertEqual(response.status_code, 200)
+        prime_client_captcha(client, "CC33")
+        blocked = client.post(
+            reverse("accounts:login"),
+            {"username": "rate-user", "password": "Correct123!", "captcha": "CC33"},
+        )
+        self.assertEqual(blocked.status_code, 200)
+        self.assertContains(blocked, "登录失败次数过多，请稍后再试。")
+
+    @override_settings(
+        SECURITY_THROTTLE_POLICIES={
+            "merchant_login_ip": {"window_seconds": 600, "max_attempts": 1, "cooldown_seconds": 600},
+            "merchant_login_account": {"window_seconds": 600, "max_attempts": 1, "cooldown_seconds": 600},
+        }
+    )
+    def test_merchant_login_uses_stricter_rate_limit(self):
+        User.objects.create_user(
+            username="merchant-strict",
+            email="merchant-strict@example.com",
+            phone="13800138091",
+            password="Merchant123!",
+            is_staff=True,
+            is_merchant=True,
+        )
+        client = Client()
+        prime_client_captcha(client, "ZX12")
+        first = client.post(
+            reverse("accounts:merchant_login"),
+            {"username": "merchant-strict", "password": "WrongPass123!", "captcha": "ZX12"},
+        )
+        self.assertEqual(first.status_code, 200)
+        prime_client_captcha(client, "ZX34")
+        second = client.post(
+            reverse("accounts:merchant_login"),
+            {"username": "merchant-strict", "password": "Merchant123!", "captcha": "ZX34"},
+        )
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "商家登录失败次数过多，请稍后再试。")
 
     def test_login_page_uses_configured_site_name(self):
         response = self.client.get(reverse("accounts:login"), HTTP_HOST="127.0.0.1:8000")

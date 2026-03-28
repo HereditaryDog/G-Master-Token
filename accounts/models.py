@@ -48,3 +48,27 @@ class EmailVerificationCode(models.Model):
     def is_valid(self):
         now = timezone.now()
         return self.consumed_at is None and self.expires_at >= now
+
+
+class SecurityThrottle(models.Model):
+    scope = models.CharField("限流场景", max_length=50)
+    bucket = models.CharField("限流桶", max_length=255)
+    attempt_count = models.PositiveIntegerField("尝试次数", default=0)
+    window_started_at = models.DateTimeField("窗口开始时间", default=timezone.now)
+    last_attempt_at = models.DateTimeField("最后尝试时间", default=timezone.now)
+    blocked_until = models.DateTimeField("封禁截至时间", null=True, blank=True)
+
+    class Meta:
+        ordering = ("scope", "bucket")
+        verbose_name = "安全限流记录"
+        verbose_name_plural = "安全限流记录"
+        constraints = [
+            models.UniqueConstraint(fields=("scope", "bucket"), name="accounts_securitythrottle_scope_bucket_uniq"),
+        ]
+        indexes = [
+            models.Index(fields=("scope", "bucket")),
+            models.Index(fields=("blocked_until",)),
+        ]
+
+    def __str__(self):
+        return f"{self.scope}:{self.bucket}"
