@@ -212,23 +212,31 @@ class Command(BaseCommand):
 
         announcements = [
             {
-                "title": "全站商品已统一为人民币结算，充值面值按美元展示",
-                "body": "商品卡面显示的是美元充值面值，实际下单和结算金额统一按人民币展示。",
+                "title": "平台已接入真实 Stripe 支付主链路",
+                "body": "当前版本已经支持真实 Stripe Checkout、支付回跳、Webhook 状态同步与支付结果落库，正在持续完善正式收款配置。",
                 "sort_order": 1,
                 "is_pinned": True,
             },
             {
-                "title": "支付测试商品已覆盖 1 / 5 / 10 / 30 / 50 / 100 美元和多档套餐",
-                "body": "现在可以直接用不同人民币金额的商品做支付通道联调、回调验证和对账测试。",
+                "title": "登录、发码、查单与商家入口已完成第一轮安全加固",
+                "body": "当前已启用服务端图形验证码、登录限流、注册发码限流、查单频控和更严格的商家登录保护，后续将继续补齐 2FA。",
                 "sort_order": 2,
                 "is_pinned": True,
             },
+            {
+                "title": "测试商品现已覆盖多档美元充值卡与企业套餐",
+                "body": "站内商品已覆盖 1 / 5 / 10 / 30 / 50 / 100 美元充值卡，以及多档套餐，可继续用于支付回调、对账和发货联调测试。",
+                "sort_order": 3,
+                "is_pinned": False,
+            },
         ]
 
+        announcement_titles = [item["title"] for item in announcements]
         for item in announcements:
             notice, created = SiteAnnouncement.objects.update_or_create(title=item["title"], defaults=item)
             action = "创建" if created else "更新"
             self.stdout.write(self.style.SUCCESS(f"{action}公告: {notice.title}"))
+        SiteAnnouncement.objects.exclude(title__in=announcement_titles).update(is_active=False, is_pinned=False)
 
         articles = [
             {
