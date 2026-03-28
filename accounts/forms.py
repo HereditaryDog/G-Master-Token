@@ -7,6 +7,7 @@ from django.contrib.auth.forms import (
     SetPasswordForm,
     UserCreationForm,
 )
+from django.core.validators import RegexValidator
 from django.utils import timezone
 
 from .models import EmailVerificationCode, User
@@ -18,6 +19,10 @@ class SignUpForm(UserCreationForm):
     email = forms.EmailField(label="邮箱地址")
     phone = forms.CharField(label="手机号", max_length=32)
     email_code = forms.CharField(label="邮箱验证码", max_length=6)
+    mobile_validator = RegexValidator(
+        regex=r"^1\d{10}$",
+        message="请输入有效的手机号。",
+    )
 
     class Meta:
         model = User
@@ -30,9 +35,12 @@ class SignUpForm(UserCreationForm):
         return email
 
     def clean_phone(self):
-        phone = self.cleaned_data["phone"].strip()
+        phone = self.cleaned_data["phone"].strip().replace(" ", "").replace("-", "")
+        if phone.startswith("+86"):
+            phone = phone[3:]
         if not phone:
             raise forms.ValidationError("手机号不能为空。")
+        self.mobile_validator(phone)
         return phone
 
     def clean_email_code(self):

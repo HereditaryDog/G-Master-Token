@@ -116,6 +116,9 @@
                             <td>
                                 <div class="table-actions">
                                     <a class="ghost-button" href="{% url 'shop:order_detail' order.order_no %}">查看</a>
+                                    {% if order.status == "pending_payment" and order.payment_status != "paid" %}
+                                        <a class="primary-button" href="{% url 'shop:checkout' order.order_no %}">继续支付</a>
+                                    {% endif %}
                                     <form method="post" action="{% url 'shop:reorder' order.order_no %}">
                                         {% csrf_token %}
                                         <button type="submit" class="ghost-button">再次购买</button>

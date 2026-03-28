@@ -147,6 +147,30 @@ class AccountAuthFlowTests(TestCase):
         self.assertTrue(user.email_verified)
         self.assertIsNotNone(verification.consumed_at)
 
+    def test_signup_rejects_invalid_phone_number(self):
+        verification = EmailVerificationCode.objects.create(
+            email="invalid-phone@example.com",
+            purpose=EmailVerificationCode.Purpose.SIGNUP,
+            code="123456",
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        response = self.client.post(
+            reverse("accounts:signup"),
+            {
+                "username": "invalid-phone-user",
+                "email": "invalid-phone@example.com",
+                "phone": "1234567890",
+                "email_code": "123456",
+                "password1": "SecurePass123!",
+                "password2": "SecurePass123!",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "请输入有效的手机号。")
+        self.assertFalse(User.objects.filter(username="invalid-phone-user").exists())
+        verification.refresh_from_db()
+        self.assertIsNone(verification.consumed_at)
+
     def test_login_supports_username_or_email_with_captcha(self):
         user = User.objects.create_user(
             username="buyer",

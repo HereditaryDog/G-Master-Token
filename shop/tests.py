@@ -736,6 +736,13 @@ class AccountCenterEnhancementTests(TestCase):
         self.assertContains(response, self.completed_order.order_no)
         self.assertNotContains(response, self.pending_order.order_no)
 
+    def test_account_center_shows_continue_payment_for_pending_order(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("shop:account_center"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("shop:checkout", args=[self.pending_order.order_no]))
+        self.assertContains(response, "继续支付")
+
     def test_user_can_reorder_from_account_center(self):
         self.client.force_login(self.user)
         response = self.client.post(reverse("shop:reorder", args=[self.completed_order.order_no]))

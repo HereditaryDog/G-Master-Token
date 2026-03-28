@@ -2,6 +2,22 @@
 
 本文件记录项目的可见版本变更。
 
+## 0.1.11 - 2026-03-29
+
+### Changed
+
+- 账号中心里的待支付订单新增“继续支付”入口，避免用户只能重新下单
+- 注册页手机号改为真正格式校验，支持清洗 `+86`、空格和横杠后再校验
+
+### Fixed
+
+- 修复待支付订单在“我的订单”列表里缺少继续支付入口的问题
+- 修复注册手机号可被任意乱填的问题
+
+### Verified
+
+- `manage.py test accounts.tests.AccountAuthFlowTests shop.tests.AccountCenterEnhancementTests`
+
 ## 0.1.10 - 2026-03-29
 
 ### Added
