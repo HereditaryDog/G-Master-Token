@@ -216,7 +216,7 @@ class StorefrontView(ListView):
     context_object_name = "products"
 
     def get_queryset(self):
-        queryset = Product.objects.filter(is_active=True).select_related("category")
+        queryset = Product.objects.filter(is_active=True, is_deleted=False).select_related("category")
         keyword = self.request.GET.get("q", "").strip()
         if keyword:
             queryset = queryset.filter(
@@ -241,12 +241,12 @@ class ProductDetailView(DetailView):
     slug_url_kwarg = "slug"
 
     def get_queryset(self):
-        return Product.objects.filter(is_active=True).select_related("category")
+        return Product.objects.filter(is_active=True, is_deleted=False).select_related("category")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["form"] = AddToCartForm()
-        related_queryset = Product.objects.filter(is_active=True).exclude(pk=self.object.pk)
+        related_queryset = Product.objects.filter(is_active=True, is_deleted=False).exclude(pk=self.object.pk)
         if self.object.category_id:
             related_queryset = related_queryset.filter(category_id=self.object.category_id)
         context["related_products"] = related_queryset.select_related("category")[:3]
@@ -255,7 +255,7 @@ class ProductDetailView(DetailView):
 
 class CreateOrderView(LoginRequiredMixin, View):
     def post(self, request, slug):
-        product = get_object_or_404(Product, slug=slug, is_active=True)
+        product = get_object_or_404(Product, slug=slug, is_active=True, is_deleted=False)
         form = AddToCartForm(request.POST)
         if not form.is_valid():
             messages.error(request, "购买数量不合法，请重新提交。")
@@ -605,7 +605,7 @@ class MerchantDashboardView(MerchantContextMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         orders = Order.objects.prefetch_related("items", "user")
-        products = Product.objects.select_related("category").all()
+        products = Product.objects.select_related("category").filter(is_deleted=False)
         low_stock_products = [
             product
             for product in products
@@ -754,7 +754,7 @@ class MerchantProductListView(MerchantContextMixin, ListView):
         return self._filter_form
 
     def get_queryset(self):
-        queryset = Product.objects.select_related("category").all().order_by("-is_active", "-is_featured", "price")
+        queryset = Product.objects.select_related("category").filter(is_deleted=False).order_by("-is_active", "-is_featured", "price")
         form = self.get_filter_form()
         if form.is_valid():
             query = form.cleaned_data["query"]
@@ -780,12 +780,57 @@ class MerchantProductListView(MerchantContextMixin, ListView):
 
 class MerchantProductToggleStatusView(MerchantRequiredMixin, View):
     def post(self, request, pk, *args, **kwargs):
-        product = get_object_or_404(Product, pk=pk)
+        product = get_object_or_404(Product, pk=pk, is_deleted=False)
         product.is_active = not product.is_active
         product.save(update_fields=["is_active", "updated_at"])
         state_label = "上架" if product.is_active else "下架"
         messages.success(request, f"{product.title} 已切换为{state_label}状态。")
         return redirect(request.POST.get("next") or reverse("shop:merchant_products"))
+
+
+class MerchantProductBatchActionView(MerchantRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        next_url = request.POST.get("next") or reverse("shop:merchant_products")
+        selected_ids = []
+        for raw_id in request.POST.getlist("product_ids"):
+            try:
+                selected_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+
+        if not selected_ids:
+            messages.error(request, "请先选择至少一个商品。")
+            return redirect(next_url)
+
+        products = list(Product.objects.filter(pk__in=selected_ids).order_by("id"))
+        if not products:
+            messages.error(request, "未找到可操作的商品。")
+            return redirect(next_url)
+
+        action = request.POST.get("action", "").strip()
+        product_ids = [product.id for product in products]
+
+        if action == "activate":
+            updated_count = Product.objects.filter(pk__in=product_ids).exclude(is_active=True).update(is_active=True)
+            messages.success(request, f"已批量上架 {updated_count} 个商品。")
+            return redirect(next_url)
+
+        if action == "deactivate":
+            updated_count = Product.objects.filter(pk__in=product_ids).exclude(is_active=False).update(is_active=False)
+            messages.success(request, f"已批量下架 {updated_count} 个商品。")
+            return redirect(next_url)
+
+        if action == "delete":
+            deleted_count = Product.objects.filter(pk__in=product_ids, is_deleted=False).update(
+                is_deleted=True,
+                is_active=False,
+                is_featured=False,
+            )
+            messages.success(request, f"已删除 {deleted_count} 个商品。历史订单仍会保留，但商品已从后台列表和前台隐藏。")
+            return redirect(next_url)
+
+        messages.error(request, "不支持的批量操作。")
+        return redirect(next_url)
 
 
 class MerchantProductCreateView(MerchantContextMixin, CreateView):
@@ -805,6 +850,9 @@ class MerchantProductUpdateView(MerchantContextMixin, UpdateView):
     model = Product
     success_url = reverse_lazy("shop:merchant_products")
     merchant_tab = "products"
+
+    def get_queryset(self):
+        return Product.objects.filter(is_deleted=False)
 
     def form_valid(self, form):
         messages.success(self.request, "商品已更新。")
@@ -866,7 +914,7 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
         if product_id and product_id.isdigit():
             card_codes = card_codes.filter(product_id=product_id)
         context["card_codes"] = card_codes[:50]
-        context["products"] = Product.objects.order_by("title")
+        context["products"] = Product.objects.filter(is_deleted=False).order_by("title")
         context["current_product_id"] = product_id or ""
         context["import_preview"] = self.get_import_preview()
         context["import_history"] = InventoryImportBatch.objects.select_related("product", "operator")[:12]

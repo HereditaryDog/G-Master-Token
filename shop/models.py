@@ -114,6 +114,7 @@ class Product(TimeStampedModel):
     low_stock_threshold = models.PositiveIntegerField("低库存提醒阈值", default=3)
     is_active = models.BooleanField("上架中", default=True)
     is_featured = models.BooleanField("首页推荐", default=True)
+    is_deleted = models.BooleanField("已删除", default=False)
 
     class Meta:
         ordering = ("-is_featured", "price")

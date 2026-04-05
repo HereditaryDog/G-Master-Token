@@ -30,19 +30,61 @@
                     <div class="filter-toolbar__actions">
                         <button type="submit" class="primary-button">筛选</button>
                         <a class="ghost-button" href="{% url 'shop:merchant_products' %}">重置</a>
+                        <a class="primary-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
                     </div>
                 </form>
-                <div class="toolbar-cluster__cta">
-                    <a class="primary-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
-                </div>
             </div>
         </section>
 
         <section class="content-card soft">
+            <form
+                id="merchant-product-batch-form"
+                method="post"
+                action="{% url 'shop:merchant_product_batch_action' %}"
+            >
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            </form>
+            <div class="merchant-batch-toolbar">
+                <label class="merchant-batch-select-all" for="merchant-products-select-all">
+                    <input type="checkbox" id="merchant-products-select-all">
+                    <span>全选当前列表</span>
+                </label>
+                <div class="merchant-batch-actions">
+                    <button
+                        type="submit"
+                        form="merchant-product-batch-form"
+                        name="action"
+                        value="activate"
+                        class="ghost-button"
+                    >
+                        批量上架
+                    </button>
+                    <button
+                        type="submit"
+                        form="merchant-product-batch-form"
+                        name="action"
+                        value="deactivate"
+                        class="ghost-button"
+                    >
+                        批量下架
+                    </button>
+                    <button
+                        type="submit"
+                        form="merchant-product-batch-form"
+                        name="action"
+                        value="delete"
+                        class="ghost-button ghost-button--danger"
+                    >
+                        批量删除
+                    </button>
+                </div>
+            </div>
             <div class="table-card compact">
                 <table>
                     <thead>
                         <tr>
+                            <th class="merchant-checkbox-cell">选择</th>
                             <th>商品</th>
                             <th>供货方式</th>
                             <th>售价（人民币）</th>
@@ -55,6 +97,15 @@
                     <tbody>
                         {% for product in products %}
                             <tr>
+                                <td class="merchant-checkbox-cell">
+                                    <input
+                                        type="checkbox"
+                                        name="product_ids"
+                                        value="{{ product.id }}"
+                                        form="merchant-product-batch-form"
+                                        class="merchant-product-checkbox"
+                                    >
+                                </td>
                                 <td>
                                     <strong>{{ product.title }}</strong>
                                     <div class="muted">{{ product.slug }}</div>
@@ -79,7 +130,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="7">还没有商品，先创建第一个点卡商品。</td>
+                                <td colspan="8">还没有商品，先创建第一个点卡商品。</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -88,4 +139,27 @@
         </section>
     </div>
 </section>
+<script>
+    (() => {
+        const selectAll = document.getElementById("merchant-products-select-all");
+        const checkboxes = Array.from(document.querySelectorAll(".merchant-product-checkbox"));
+        if (!selectAll || !checkboxes.length) {
+            return;
+        }
+        const syncSelectAll = () => {
+            selectAll.checked = checkboxes.every((checkbox) => checkbox.checked);
+            selectAll.indeterminate = !selectAll.checked && checkboxes.some((checkbox) => checkbox.checked);
+        };
+        selectAll.addEventListener("change", () => {
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = selectAll.checked;
+            });
+            syncSelectAll();
+        });
+        checkboxes.forEach((checkbox) => {
+            checkbox.addEventListener("change", syncSelectAll);
+        });
+        syncSelectAll();
+    })();
+</script>
 {% endblock %}

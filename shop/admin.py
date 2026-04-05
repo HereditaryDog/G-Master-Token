@@ -58,8 +58,8 @@ class HelpArticleAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("title", "category", "price", "delivery_method", "low_stock_threshold", "is_active", "is_featured")
-    list_filter = ("category", "delivery_method", "is_active", "is_featured")
+    list_display = ("title", "category", "price", "delivery_method", "low_stock_threshold", "is_active", "is_featured", "is_deleted")
+    list_filter = ("category", "delivery_method", "is_active", "is_featured", "is_deleted")
     search_fields = ("title", "slug", "provider_sku")
     prepopulated_fields = {"slug": ("title",)}
 

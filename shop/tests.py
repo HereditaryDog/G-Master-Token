@@ -630,6 +630,73 @@ class MerchantOperationsTests(TestCase):
         inactive_product.refresh_from_db()
         self.assertTrue(inactive_product.is_active)
 
+    def test_batch_product_status_actions_can_activate_and_deactivate_selected_products(self):
+        self.client.force_login(self.owner)
+        inactive_product = Product.objects.create(
+            category=self.category,
+            title="Inactive Batch Card",
+            slug="inactive-batch-card",
+            summary="待批量上架商品",
+            description="待批量上架商品详情",
+            face_value="8.00",
+            token_amount=800,
+            price="8.00",
+            delivery_method=Product.DeliveryMethod.PARTNER_API,
+            is_active=False,
+        )
+
+        activate_response = self.client.post(
+            reverse("shop:merchant_product_batch_action"),
+            {"action": "activate", "product_ids": [inactive_product.id]},
+        )
+        self.assertEqual(activate_response.status_code, 302)
+        inactive_product.refresh_from_db()
+        self.assertTrue(inactive_product.is_active)
+
+        deactivate_response = self.client.post(
+            reverse("shop:merchant_product_batch_action"),
+            {"action": "deactivate", "product_ids": [self.product.id, inactive_product.id]},
+        )
+        self.assertEqual(deactivate_response.status_code, 302)
+        self.product.refresh_from_db()
+        inactive_product.refresh_from_db()
+        self.assertFalse(self.product.is_active)
+        self.assertFalse(inactive_product.is_active)
+
+    def test_batch_product_delete_skips_products_referenced_by_orders(self):
+        self.client.force_login(self.owner)
+        deletable_product = Product.objects.create(
+            category=self.category,
+            title="Delete Me",
+            slug="delete-me",
+            summary="可删除商品",
+            description="可删除商品详情",
+            face_value="6.00",
+            token_amount=600,
+            price="6.00",
+            delivery_method=Product.DeliveryMethod.PARTNER_API,
+            is_active=False,
+        )
+
+        response = self.client.post(
+            reverse("shop:merchant_product_batch_action"),
+            {"action": "delete", "product_ids": [deletable_product.id, self.product.id]},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        deletable_product.refresh_from_db()
+        self.product.refresh_from_db()
+        self.assertTrue(deletable_product.is_deleted)
+        self.assertTrue(self.product.is_deleted)
+        self.assertFalse(deletable_product.is_active)
+        self.assertFalse(self.product.is_active)
+        merchant_list = self.client.get(reverse("shop:merchant_products"))
+        self.assertNotContains(merchant_list, deletable_product.title)
+        self.assertNotContains(merchant_list, self.product.title)
+        messages = list(response.context["messages"])
+        self.assertTrue(any("已删除 2 个商品" in str(message) for message in messages))
+
     def test_card_codes_are_encrypted_at_rest(self):
         card = CardCode.objects.create(product=self.product, code="SECRET-CODE-1234", note="安全测试")
         card.refresh_from_db()

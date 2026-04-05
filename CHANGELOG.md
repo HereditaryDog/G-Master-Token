@@ -2,6 +2,30 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.0.1 - 2026-04-05
+
+### Added
+
+- 商家后台商品管理页新增批量操作，支持批量上架、批量下架与批量删除
+- 商品模型新增软删除标记，删除后的商品会自动从前台与商家列表隐藏
+
+### Changed
+
+- 仓库发布版本提升为 `1.0.1`
+- 商品删除策略从物理删除调整为软删除，历史订单引用的商品也可以安全执行删除操作
+- 商品选择器、商品详情、首页商品列表与商家商品列表统一过滤已删除商品
+
+### Fixed
+
+- 修复商家后台批量删除商品时，已被订单引用的商品因数据库保护关系无法删除的问题
+- 修复库存卡密导入等后台表单仍可选中已删除商品的问题
+
+### Verified
+
+- `docker compose --env-file .env.server exec -T web python manage.py test shop.tests.MerchantOperationsTests.test_batch_product_status_actions_can_activate_and_deactivate_selected_products shop.tests.MerchantOperationsTests.test_batch_product_delete_skips_products_referenced_by_orders`
+- `docker compose --env-file .env.server exec -T web python manage.py showmigrations shop`
+- `https://gmtoken.shop/health/`
+
 ## 1.0.0 - 2026-04-05
 
 ### Added

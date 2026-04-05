@@ -94,7 +94,7 @@ class MerchantProductFilterForm(forms.Form):
 
 class CardCodeBatchForm(forms.Form):
     product = forms.ModelChoiceField(
-        queryset=Product.objects.order_by("title"),
+        queryset=Product.objects.filter(is_deleted=False).order_by("title"),
         label="关联商品",
     )
     note = forms.CharField(label="备注", max_length=120, required=False)
@@ -103,6 +103,10 @@ class CardCodeBatchForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 10}),
         help_text="一行一个卡密，系统会自动去重。",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = Product.objects.filter(is_deleted=False).order_by("title")
 
     def clean_codes(self):
         raw_codes = self.cleaned_data["codes"]

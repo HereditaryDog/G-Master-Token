@@ -206,7 +206,10 @@ class Command(BaseCommand):
         ]
 
         for item in samples:
-            product, created = Product.objects.update_or_create(slug=item["slug"], defaults=item)
+            product, created = Product.objects.update_or_create(
+                slug=item["slug"],
+                defaults={**item, "is_deleted": False},
+            )
             action = "创建" if created else "更新"
             self.stdout.write(self.style.SUCCESS(f"{action}商品: {product.title}"))
 
