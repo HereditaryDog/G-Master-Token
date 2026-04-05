@@ -1,7 +1,7 @@
 # G-Master-Token
 
 面向数字点卡、Token 充值与自动发货场景的商城系统。  
-当前版本：`1.0.1`
+当前版本：`1.0.2`
 
 快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
@@ -37,6 +37,7 @@ G-Master-Token 是一套基于 Django 的完整商城与交付系统，覆盖：
 - 已接入 Stripe Checkout 跳转支付
 - 已接入 Stripe Webhook：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`
 - 支持库存卡密自动发货
+- 支持库存卡密按商品筛选、批量删除与低库存高亮提醒
 - 支持合作 API 自动供货，路径、鉴权头和鉴权方案均可通过环境变量配置
 
 ### 用户与后台
@@ -276,7 +277,7 @@ docker compose --env-file .env.server logs -f web
 
 ## 当前发布状态
 
-`1.0.1` 版本已经完成以下关键链路：
+`1.0.2` 版本已经完成以下关键链路：
 
 - Stripe 测试支付已接通
 - Webhook 回调地址已固定为公网 HTTPS 域名
@@ -285,6 +286,7 @@ docker compose --env-file .env.server logs -f web
 - Docker + PostgreSQL + Cloudflare Tunnel 已跑通
 - 支付配置、供货配置、数据库配置均已环境变量化
 - 商家后台商品管理已支持批量上架、批量下架与软删除
+- 库存卡密页已支持库存概览、按商品筛选和批量删除可售卡密
 
 ## 路线图
 

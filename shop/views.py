@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core import signing
 from django.core.mail import send_mail
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -19,6 +19,7 @@ from .forms import (
     AddToCartForm,
     CardCodeBatchForm,
     GuestOrderLookupForm,
+    MerchantInventoryFilterForm,
     MerchantOrderFilterForm,
     MerchantProductFilterForm,
     MerchantSupportTicketFilterForm,
@@ -868,6 +869,50 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
     def get_import_preview(self):
         return getattr(self, "import_preview", None)
 
+    def get_initial(self):
+        initial = super().get_initial()
+        product_id = self.request.GET.get("product", "").strip()
+        if product_id.isdigit():
+            initial["product"] = product_id
+        return initial
+
+    def get_filter_form(self):
+        if not hasattr(self, "_filter_form"):
+            self._filter_form = MerchantInventoryFilterForm(self.request.GET or None)
+        return self._filter_form
+
+    def get_inventory_queryset(self):
+        queryset = CardCode.objects.select_related("product").filter(
+            product__is_deleted=False,
+            product__delivery_method=Product.DeliveryMethod.STOCK_CARD,
+        )
+        form = self.get_filter_form()
+        if form.is_valid():
+            product = form.cleaned_data["product"]
+            status = form.cleaned_data["status"]
+            query = form.cleaned_data["query"]
+            if product:
+                queryset = queryset.filter(product=product)
+            if status:
+                queryset = queryset.filter(status=status)
+            if query:
+                queryset = queryset.filter(
+                    Q(product__title__icontains=query)
+                    | Q(product__slug__icontains=query)
+                    | Q(note__icontains=query)
+                )
+        return queryset.order_by("-created_at")
+
+    def get_inventory_products(self):
+        return Product.objects.filter(
+            is_deleted=False,
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+        ).annotate(
+            available_count=Count("card_codes", filter=Q(card_codes__status=CardCode.Status.AVAILABLE), distinct=True),
+            sold_count=Count("card_codes", filter=Q(card_codes__status=CardCode.Status.SOLD), distinct=True),
+            total_count=Count("card_codes", distinct=True),
+        ).order_by("-available_count", "title")
+
     def form_valid(self, form):
         product = form.cleaned_data["product"]
         note = form.cleaned_data["note"]
@@ -909,15 +954,35 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        product_id = self.request.GET.get("product")
-        card_codes = CardCode.objects.select_related("product").order_by("-created_at")
-        if product_id and product_id.isdigit():
-            card_codes = card_codes.filter(product_id=product_id)
-        context["card_codes"] = card_codes[:50]
-        context["products"] = Product.objects.filter(is_deleted=False).order_by("title")
-        context["current_product_id"] = product_id or ""
+        inventory_queryset = self.get_inventory_queryset()
+        filter_form = self.get_filter_form()
+        selected_product = None
+        if filter_form.is_valid():
+            selected_product = filter_form.cleaned_data["product"]
+        inventory_products = self.get_inventory_products()
+        context["card_codes"] = inventory_queryset[:100]
+        context["products"] = inventory_products
+        context["filter_form"] = filter_form
+        context["current_product_id"] = str(selected_product.id) if selected_product else ""
         context["import_preview"] = self.get_import_preview()
-        context["import_history"] = InventoryImportBatch.objects.select_related("product", "operator")[:12]
+        import_history = InventoryImportBatch.objects.select_related("product", "operator")
+        if selected_product:
+            import_history = import_history.filter(product=selected_product)
+        context["import_history"] = import_history[:12]
+        context["inventory_metrics"] = {
+            "product_count": inventory_products.count(),
+            "available_count": CardCode.objects.filter(
+                product__is_deleted=False,
+                product__delivery_method=Product.DeliveryMethod.STOCK_CARD,
+                status=CardCode.Status.AVAILABLE,
+            ).count(),
+            "sold_count": CardCode.objects.filter(
+                product__is_deleted=False,
+                product__delivery_method=Product.DeliveryMethod.STOCK_CARD,
+                status=CardCode.Status.SOLD,
+            ).count(),
+            "filtered_count": inventory_queryset.count(),
+        }
         return context
 
 
@@ -933,6 +998,45 @@ class MerchantInventoryCodeRevealView(MerchantRequiredMixin, View):
             metadata={"product_id": card.product_id},
         )
         return JsonResponse({"ok": True, "code": plaintext, "masked_code": card.masked_code})
+
+
+class MerchantInventoryBatchActionView(MerchantRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        next_url = request.POST.get("next") or reverse("shop:merchant_inventory")
+        selected_ids = []
+        for raw_id in request.POST.getlist("card_code_ids"):
+            try:
+                selected_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+
+        if not selected_ids:
+            messages.error(request, "请先选择至少一条卡密。")
+            return redirect(next_url)
+
+        action = request.POST.get("action", "").strip()
+        queryset = CardCode.objects.select_related("product").filter(
+            pk__in=selected_ids,
+            product__is_deleted=False,
+            product__delivery_method=Product.DeliveryMethod.STOCK_CARD,
+        )
+        if not queryset.exists():
+            messages.error(request, "未找到可操作的卡密记录。")
+            return redirect(next_url)
+
+        if action == "delete":
+            deletable_queryset = queryset.filter(status=CardCode.Status.AVAILABLE)
+            deleted_count = deletable_queryset.count()
+            skipped_count = queryset.count() - deleted_count
+            deletable_queryset.delete()
+            if deleted_count:
+                messages.success(request, f"已删除 {deleted_count} 条可售卡密。")
+            if skipped_count:
+                messages.warning(request, f"有 {skipped_count} 条卡密已售出，未执行删除。")
+            return redirect(next_url)
+
+        messages.error(request, "不支持的库存操作。")
+        return redirect(next_url)
 
 
 class MerchantOrderListView(MerchantContextMixin, ListView):

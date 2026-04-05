@@ -2,6 +2,31 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.0.2 - 2026-04-05
+
+### Added
+
+- 库存卡密页新增商品级库存概览，可直接查看每个库存商品的可售、已售和总量
+- 库存卡密页新增按商品、状态、关键词筛选能力，并支持单条或批量删除可售卡密
+
+### Changed
+
+- 仓库发布版本提升为 `1.0.2`
+- 库存卡密页重构为导入区、库存概览区、卡密管理区三段式布局
+- 商品库存概览卡片重做为更醒目的指标卡样式，低库存商品增加高亮警示和补货提示
+- 库存导入与库存筛选统一只展示“库存卡密”类型商品，避免与 API 商品混用
+
+### Fixed
+
+- 修复库存卡密页只能查看最近记录、无法按商品做日常库存管理的问题
+- 修复已售卡密与可售卡密缺少明确区分、容易误删的问题
+
+### Verified
+
+- `docker compose --env-file .env.server exec -T web python manage.py test shop.tests.MerchantOperationsTests.test_inventory_preview_and_import_history shop.tests.MerchantOperationsTests.test_inventory_page_masks_plaintext_codes shop.tests.MerchantOperationsTests.test_inventory_page_filters_card_codes_by_product_and_status shop.tests.MerchantOperationsTests.test_inventory_batch_delete_only_removes_available_codes shop.tests.MerchantOperationsTests.test_inventory_code_reveal_returns_plaintext_and_logs`
+- `docker compose --env-file .env.server exec -T web python manage.py check`
+- `https://gmtoken.shop/health/`
+
 ## 1.0.1 - 2026-04-05
 
 ### Added

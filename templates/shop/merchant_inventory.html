@@ -11,6 +11,7 @@
             <div>
                 <p class="eyebrow">Inventory</p>
                 <h1>库存卡密管理</h1>
+                <p class="muted">按商品补货、筛选库存、删除可售卡密，并统一查看每个商品的库存状态。</p>
             </div>
         </section>
 
@@ -72,58 +73,211 @@
             <div class="content-card soft">
                 <div class="section-heading mini">
                     <div>
-                        <h3>最近库存</h3>
-                        <p class="muted">显示最近 50 条卡密记录</p>
+                        <h3>库存概览</h3>
+                        <p class="muted">快速查看每个商品的可售库存、已售卡密和低库存状态。</p>
                     </div>
-                    <form method="get">
-                        <select name="product" onchange="this.form.submit()">
-                            <option value="">全部商品</option>
-                            {% for product in products %}
-                                <option value="{{ product.id }}" {% if current_product_id == product.id|stringformat:'s' %}selected{% endif %}>
-                                    {{ product.title }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </form>
                 </div>
-                <div class="table-card compact">
-                    <table>
-                        <thead>
+
+                <div class="summary-grid inventory-metrics-grid">
+                    <div class="summary-card">
+                        <strong>{{ inventory_metrics.product_count }}</strong>
+                        <span>库存商品</span>
+                    </div>
+                    <div class="summary-card">
+                        <strong>{{ inventory_metrics.available_count }}</strong>
+                        <span>可售卡密</span>
+                    </div>
+                    <div class="summary-card">
+                        <strong>{{ inventory_metrics.sold_count }}</strong>
+                        <span>已售卡密</span>
+                    </div>
+                    <div class="summary-card">
+                        <strong>{{ inventory_metrics.filtered_count }}</strong>
+                        <span>当前筛选结果</span>
+                    </div>
+                </div>
+
+                <div class="inventory-product-overview">
+                    {% for product in products %}
+                        <article class="inventory-product-card {% if product.low_stock_threshold and product.available_count <= product.low_stock_threshold %}inventory-product-card--warning{% endif %}">
+                            <div class="inventory-product-card__header">
+                                <div class="inventory-product-card__meta">
+                                    <strong>{{ product.title }}</strong>
+                                    <span class="muted">{{ product.slug }}</span>
+                                </div>
+                                <div class="inventory-product-card__state">
+                                    {% if product.low_stock_threshold and product.available_count <= product.low_stock_threshold %}
+                                        <span class="status-badge status-badge--warning status-badge--strong">低库存警告</span>
+                                    {% else %}
+                                        <span class="status-badge status-badge--healthy">库存正常</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="inventory-product-card__stats">
+                                <div class="inventory-stat-pill inventory-stat-pill--available">
+                                    <span>可售</span>
+                                    <strong>{{ product.available_count }}</strong>
+                                </div>
+                                <div class="inventory-stat-pill inventory-stat-pill--sold">
+                                    <span>已售</span>
+                                    <strong>{{ product.sold_count }}</strong>
+                                </div>
+                                <div class="inventory-stat-pill inventory-stat-pill--total">
+                                    <span>总量</span>
+                                    <strong>{{ product.total_count }}</strong>
+                                </div>
+                            </div>
+
+                            <div class="inventory-product-card__footer">
+                                {% if product.low_stock_threshold and product.available_count <= product.low_stock_threshold %}
+                                    <div class="inventory-product-card__alert inventory-product-card__alert--warning">
+                                        <strong>需要补货</strong>
+                                        <span>当前仅剩 {{ product.available_count }} 张，低于提醒阈值 {{ product.low_stock_threshold }} 张。</span>
+                                    </div>
+                                {% else %}
+                                    <div class="inventory-product-card__alert">
+                                        <strong>库存稳定</strong>
+                                        <span>当前库存高于阈值，可继续正常销售。</span>
+                                    </div>
+                                {% endif %}
+                                <div class="inventory-product-card__actions">
+                                    <a class="ghost-button" href="{% url 'shop:merchant_inventory' %}?product={{ product.id }}">查看卡密</a>
+                                </div>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <p class="muted">还没有库存卡密商品，先创建商品并导入第一批卡密。</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <section class="content-card soft">
+            <div class="section-heading mini">
+                <div>
+                    <h3>卡密库存管理</h3>
+                    <p class="muted">支持按商品、状态筛选，并批量删除未售出的卡密。</p>
+                </div>
+            </div>
+
+            <form method="get" class="filter-toolbar filter-toolbar--inventory">
+                <label class="field">
+                    <span>{{ filter_form.product.label }}</span>
+                    {{ filter_form.product }}
+                </label>
+                <label class="field">
+                    <span>{{ filter_form.status.label }}</span>
+                    {{ filter_form.status }}
+                </label>
+                <label class="field">
+                    <span>{{ filter_form.query.label }}</span>
+                    {{ filter_form.query }}
+                </label>
+                <div class="filter-toolbar__actions">
+                    <button type="submit" class="primary-button">筛选</button>
+                    <a class="ghost-button" href="{% url 'shop:merchant_inventory' %}">重置</a>
+                </div>
+            </form>
+
+            <form
+                id="merchant-inventory-batch-form"
+                method="post"
+                action="{% url 'shop:merchant_inventory_batch_action' %}"
+            >
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            </form>
+
+            <div class="merchant-batch-toolbar">
+                <label class="merchant-batch-select-all" for="merchant-inventory-select-all">
+                    <input type="checkbox" id="merchant-inventory-select-all">
+                    <span>全选当前列表</span>
+                </label>
+                <div class="merchant-batch-actions">
+                    <button
+                        type="submit"
+                        form="merchant-inventory-batch-form"
+                        name="action"
+                        value="delete"
+                        class="ghost-button ghost-button--danger"
+                    >
+                        删除选中卡密
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-card compact">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="merchant-checkbox-cell">选择</th>
+                            <th>商品</th>
+                            <th>卡密</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>售出时间</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for code in card_codes %}
                             <tr>
-                                <th>商品</th>
-                                <th>卡密</th>
-                                <th>状态</th>
-                                <th>备注</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for code in card_codes %}
-                                <tr>
-                                    <td>{{ code.product.title }}</td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <span class="mono-mask js-sensitive-output">{{ code.masked_code }}</span>
-                                            <button
-                                                type="button"
-                                                class="ghost-button js-secure-reveal"
-                                                data-url="{% url 'shop:merchant_inventory_code_reveal' code.id %}"
-                                                data-target="closest"
-                                            >
-                                                查看
+                                <td class="merchant-checkbox-cell">
+                                    {% if code.status == "available" %}
+                                        <input
+                                            type="checkbox"
+                                            name="card_code_ids"
+                                            value="{{ code.id }}"
+                                            form="merchant-inventory-batch-form"
+                                            class="merchant-product-checkbox js-inventory-checkbox"
+                                        >
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ code.product.title }}</strong>
+                                    <div class="muted">{{ code.product.slug }}</div>
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        <span class="mono-mask js-sensitive-output">{{ code.masked_code }}</span>
+                                        <button
+                                            type="button"
+                                            class="ghost-button js-secure-reveal"
+                                            data-url="{% url 'shop:merchant_inventory_code_reveal' code.id %}"
+                                            data-target="closest"
+                                        >
+                                            查看
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>{{ code.get_status_display }}</td>
+                                <td>{{ code.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>{{ code.sold_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                                <td>{{ code.note|default:"-" }}</td>
+                                <td>
+                                    {% if code.status == "available" %}
+                                        <form method="post" action="{% url 'shop:merchant_inventory_batch_action' %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <input type="hidden" name="card_code_ids" value="{{ code.id }}">
+                                            <button type="submit" name="action" value="delete" class="ghost-button ghost-button--danger">
+                                                删除
                                             </button>
-                                        </div>
-                                    </td>
-                                    <td>{{ code.get_status_display }}</td>
-                                    <td>{{ code.note|default:"-" }}</td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="4">当前没有库存记录。</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                                        </form>
+                                    {% else %}
+                                        <span class="muted">已售不可删</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8">当前筛选条件下没有卡密记录。</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </section>
 
@@ -196,6 +350,26 @@ document.addEventListener("DOMContentLoaded", function () {
             }, 1400);
         });
     });
+
+    const selectAll = document.getElementById("merchant-inventory-select-all");
+    const checkboxes = Array.from(document.querySelectorAll(".js-inventory-checkbox"));
+    if (!selectAll || !checkboxes.length) {
+        return;
+    }
+    const syncSelectAll = () => {
+        selectAll.checked = checkboxes.every((checkbox) => checkbox.checked);
+        selectAll.indeterminate = !selectAll.checked && checkboxes.some((checkbox) => checkbox.checked);
+    };
+    selectAll.addEventListener("change", () => {
+        checkboxes.forEach((checkbox) => {
+            checkbox.checked = selectAll.checked;
+        });
+        syncSelectAll();
+    });
+    checkboxes.forEach((checkbox) => {
+        checkbox.addEventListener("change", syncSelectAll);
+    });
+    syncSelectAll();
 });
 </script>
 {% endblock %}

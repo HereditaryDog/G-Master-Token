@@ -741,6 +741,51 @@ class MerchantOperationsTests(TestCase):
         self.assertNotContains(response, "OPS-CODE-0001")
         self.assertContains(response, "OPS-...0001")
 
+    def test_inventory_page_filters_card_codes_by_product_and_status(self):
+        self.client.force_login(self.owner)
+        second_product = Product.objects.create(
+            category=self.category,
+            title="Second Stock Card",
+            slug="second-stock-card",
+            summary="第二个库存商品",
+            description="第二个库存商品详情",
+            face_value="12.00",
+            token_amount=1200,
+            price="12.00",
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+            is_active=True,
+        )
+        second_code = CardCode.objects.create(product=second_product, code="SECOND-CODE-0001", note="第二商品备注")
+
+        response = self.client.get(
+            reverse("shop:merchant_inventory"),
+            {"product": second_product.id, "status": CardCode.Status.AVAILABLE, "query": "第二商品"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        card_codes = list(response.context["card_codes"])
+        self.assertEqual(len(card_codes), 1)
+        self.assertEqual(card_codes[0].id, second_code.id)
+        self.assertEqual(response.context["inventory_metrics"]["filtered_count"], 1)
+
+    def test_inventory_batch_delete_only_removes_available_codes(self):
+        self.client.force_login(self.owner)
+        available_card = CardCode.objects.filter(product=self.product, status=CardCode.Status.AVAILABLE).first()
+        sold_card = CardCode.objects.filter(product=self.product, status=CardCode.Status.SOLD).first()
+
+        response = self.client.post(
+            reverse("shop:merchant_inventory_batch_action"),
+            {"action": "delete", "card_code_ids": [available_card.id, sold_card.id]},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(CardCode.objects.filter(pk=available_card.id).exists())
+        self.assertTrue(CardCode.objects.filter(pk=sold_card.id).exists())
+        messages = [str(message) for message in response.context["messages"]]
+        self.assertTrue(any("已删除 1 条可售卡密" in message for message in messages))
+        self.assertTrue(any("有 1 条卡密已售出，未执行删除" in message for message in messages))
+
     def test_inventory_code_reveal_returns_plaintext_and_logs(self):
         self.client.force_login(self.owner)
         card = CardCode.objects.get(code_hash=CardCode.build_code_hash("OPS-CODE-0001"))

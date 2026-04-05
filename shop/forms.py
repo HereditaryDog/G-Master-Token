@@ -94,7 +94,10 @@ class MerchantProductFilterForm(forms.Form):
 
 class CardCodeBatchForm(forms.Form):
     product = forms.ModelChoiceField(
-        queryset=Product.objects.filter(is_deleted=False).order_by("title"),
+        queryset=Product.objects.filter(
+            is_deleted=False,
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+        ).order_by("title"),
         label="关联商品",
     )
     note = forms.CharField(label="备注", max_length=120, required=False)
@@ -106,7 +109,10 @@ class CardCodeBatchForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["product"].queryset = Product.objects.filter(is_deleted=False).order_by("title")
+        self.fields["product"].queryset = Product.objects.filter(
+            is_deleted=False,
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+        ).order_by("title")
 
     def clean_codes(self):
         raw_codes = self.cleaned_data["codes"]
@@ -145,6 +151,27 @@ class CardCodeBatchForm(forms.Form):
             "duplicate_count": len(duplicate_in_upload) + len(existing_codes),
             "duplicate_samples": duplicate_samples[:12],
         }
+
+
+class MerchantInventoryFilterForm(forms.Form):
+    product = forms.ModelChoiceField(
+        queryset=Product.objects.none(),
+        label="关联商品",
+        required=False,
+        empty_label="全部商品",
+    )
+    status = forms.ChoiceField(label="库存状态", required=False)
+    query = forms.CharField(label="搜索", required=False, max_length=120)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = Product.objects.filter(
+            is_deleted=False,
+            delivery_method=Product.DeliveryMethod.STOCK_CARD,
+        ).order_by("title")
+        self.fields["product"].queryset = queryset
+        self.fields["status"].choices = [("", "全部状态"), *CardCode.Status.choices]
+        self.fields["query"].widget.attrs.update({"placeholder": "商品名 / slug / 备注"})
 
 
 class SupportTicketCreateForm(forms.Form):
