@@ -9,8 +9,9 @@ from .version import VERSION
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+INSECURE_DEFAULT_SECRET_KEY = "dev-insecure-secret-key"
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-secret-key")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", INSECURE_DEFAULT_SECRET_KEY)
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 ALLOWED_HOSTS = [
     host.strip()
@@ -173,6 +174,9 @@ STORAGES = {
 }
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+LOG_DIR = Path(os.getenv("DJANGO_LOG_DIR", BASE_DIR / "runtime_logs"))
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO").upper()
 
 LOGIN_REDIRECT_URL = 'shop:storefront'
 LOGOUT_REDIRECT_URL = 'shop:storefront'
@@ -193,6 +197,49 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+        "app_file": {
+            "class": "logging.FileHandler",
+            "filename": str(LOG_DIR / "app.log"),
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console", "app_file"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "app_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "accounts": {
+            "handlers": ["console", "app_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "shop": {
+            "handlers": ["console", "app_file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+    },
+}
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

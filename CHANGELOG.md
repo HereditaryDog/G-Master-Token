@@ -2,6 +2,37 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.1.2 - 2026-04-05
+
+### Added
+
+- 新增统一安全跳转辅助逻辑，商家后台商品、库存、订单操作中的 `next` 参数统一改为站内安全校验
+- 新增库存卡密标准分页，`/dashboard/inventory/` 现支持 `page` 查询参数并保留现有筛选条件
+- 新增 Django 文件日志输出，默认写入 `/app/runtime_logs/app.log`
+
+### Changed
+
+- 仓库发布版本提升为 `1.1.2`
+- 保留 `DJANGO_SECRET_KEY`、`CARD_SECRET_KEY` 回退和 `DEBUG` 默认值的开发便利，但 readiness / preflight 现在会明确提示生产风险
+- 首页与账号中心的搜索改为 GET Form 校验，`q` 超过 120 字符只报错不执行过滤
+- Docker `web` 容器改为非 root 用户 `appuser` 运行
+- 示例环境文件、README 和 DEPLOYMENT 文档补充了 `TRUSTED_PROXY_IPS`、日志持久化和生产必须覆写项说明
+
+### Fixed
+
+- 修复商家后台多个批量操作接口可接受外部 `next` 地址，存在开放重定向风险的问题
+- 修复密码修改和密码重置模板仍对 `help_text` 使用 `|safe` 的输出风险
+- 修复库存卡密页只截取最近记录、无法做标准分页浏览的问题
+
+### Verified
+
+- `docker compose --env-file .env.server run --rm web python manage.py test accounts.tests.AccountAuthFlowTests shop.tests.StoreOrderFlowTests shop.tests.MerchantOperationsTests shop.tests.AccountCenterEnhancementTests shop.tests.ReadinessChecksTests`
+- `docker compose --env-file .env.server run --rm web python manage.py check`
+- `docker compose --env-file .env.server build web`
+- `docker compose --env-file .env.server exec -T web id -u`
+- `https://gmtoken.shop/health/`
+- `https://gmtoken.shop/health/readiness/`
+
 ## 1.0.2 - 2026-04-05
 
 ### Added

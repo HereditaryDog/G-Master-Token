@@ -80,6 +80,35 @@ class AccountAuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "当前测试站未配置真实邮件发送")
 
+    def test_password_change_template_escapes_help_text_html(self):
+        user = User.objects.create_user(
+            username="password-user",
+            email="password-user@example.com",
+            phone="13800138111",
+            password="Buyer123!",
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("password_change"))
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("&lt;ul&gt;", html)
+        self.assertNotIn("<ul>", html)
+
+    def test_password_reset_confirm_template_escapes_help_text_html(self):
+        user = User.objects.create_user(
+            username="reset-user",
+            email="reset-user@example.com",
+            phone="13800138112",
+            password="Buyer123!",
+        )
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        response = self.client.get(reverse("password_reset_confirm", args=[uid, token]), follow=True)
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("&lt;ul&gt;", html)
+        self.assertNotIn("<ul>", html)
+
     @override_settings(
         SECURITY_THROTTLE_POLICIES={
             "signup_code_email": {"window_seconds": 600, "max_attempts": 2, "cooldown_seconds": 600},

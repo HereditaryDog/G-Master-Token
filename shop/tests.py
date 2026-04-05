@@ -100,6 +100,7 @@ class StoreOrderFlowTests(TestCase):
         self.assertContains(response, self.product.title)
         self.assertContains(response, other_product.title)
 
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=True, PAYMENT_ENABLE_STRIPE_GATEWAY=False)
     def test_mock_payment_completes_order_and_delivers_code(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -119,6 +120,7 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(DeliveryRecord.objects.filter(order_item__order=order).count(), 1)
 
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=True, PAYMENT_ENABLE_STRIPE_GATEWAY=False)
     def test_anonymous_mock_payment_redirects_to_login(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -130,6 +132,7 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("accounts:login"), response.url)
 
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=True, PAYMENT_ENABLE_STRIPE_GATEWAY=False)
     def test_mock_payment_with_out_of_stock_order_marks_failed_but_keeps_paid_status(self):
         out_of_stock_product = Product.objects.create(
             category=self.category,
@@ -204,6 +207,7 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(second.status_code, 200)
         self.assertContains(second, "查询过于频繁，请稍后再试。")
 
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=True, PAYMENT_ENABLE_STRIPE_GATEWAY=False)
     def test_guest_order_lookup_masks_delivery_codes_in_initial_html(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -220,6 +224,7 @@ class StoreOrderFlowTests(TestCase):
         self.assertNotContains(response, "CODE-0001")
         self.assertContains(response, "CODE...0001")
 
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=True, PAYMENT_ENABLE_STRIPE_GATEWAY=False)
     def test_guest_delivery_reveal_requires_matching_email_token(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -264,6 +269,7 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "客服与售后支持")
 
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=True, PAYMENT_ENABLE_STRIPE_GATEWAY=False)
     def test_checkout_page_shows_active_and_reserved_payment_gateways(self):
         client = Client()
         self.assertTrue(client.login(username="buyer", password="Buyer123!"))
@@ -418,6 +424,13 @@ class StoreOrderFlowTests(TestCase):
         self.assertContains(response, "账号中心")
         self.assertContains(response, reverse("shop:account_center"))
 
+    def test_storefront_search_rejects_overlong_query_without_filtering_results(self):
+        response = self.client.get(reverse("shop:storefront"), {"q": "x" * 121})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.product.title)
+        self.assertContains(response, self.related_product.title)
+        self.assertIn("q", response.context["search_form"].errors)
+
     def test_payment_gateway_registry_exposes_future_channels(self):
         active_codes = [gateway.code for gateway in list_active_payment_gateways()]
         reserved_codes = [gateway.code for gateway in list_reserved_payment_gateways()]
@@ -546,6 +559,19 @@ class MerchantOperationsTests(TestCase):
         self.assertEqual(self.pending_order.status, Order.Status.FAILED)
         self.assertEqual(self.pending_order.merchant_note, "用户反馈订单异常。")
 
+    def test_merchant_order_action_ignores_external_next_redirect(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_order_action", args=[self.pending_order.order_no]),
+            {
+                "action": "mark_failed",
+                "merchant_note": "用户反馈订单异常。",
+                "next": "https://evil.test/hijack",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("shop:merchant_order_detail", args=[self.pending_order.order_no]))
+
     def test_merchant_can_retry_failed_paid_order_after_restock(self):
         self.assertEqual(self.failed_paid_order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(self.failed_paid_order.status, Order.Status.FAILED)
@@ -630,6 +656,15 @@ class MerchantOperationsTests(TestCase):
         inactive_product.refresh_from_db()
         self.assertTrue(inactive_product.is_active)
 
+    def test_product_toggle_ignores_external_next_redirect(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_product_toggle", args=[self.product.id]),
+            {"next": "https://evil.test/hijack"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("shop:merchant_products"))
+
     def test_batch_product_status_actions_can_activate_and_deactivate_selected_products(self):
         self.client.force_login(self.owner)
         inactive_product = Product.objects.create(
@@ -662,6 +697,25 @@ class MerchantOperationsTests(TestCase):
         inactive_product.refresh_from_db()
         self.assertFalse(self.product.is_active)
         self.assertFalse(inactive_product.is_active)
+
+    def test_batch_product_action_ignores_external_next_redirect(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse("shop:merchant_product_batch_action"),
+            {"action": "deactivate", "product_ids": [self.product.id], "next": "https://evil.test/hijack"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("shop:merchant_products"))
+
+    def test_batch_product_action_accepts_safe_relative_next_redirect(self):
+        self.client.force_login(self.owner)
+        safe_next = f"{reverse('shop:merchant_products')}?active=inactive"
+        response = self.client.post(
+            reverse("shop:merchant_product_batch_action"),
+            {"action": "deactivate", "product_ids": [self.product.id], "next": safe_next},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, safe_next)
 
     def test_batch_product_delete_skips_products_referenced_by_orders(self):
         self.client.force_login(self.owner)
@@ -786,6 +840,48 @@ class MerchantOperationsTests(TestCase):
         self.assertTrue(any("已删除 1 条可售卡密" in message for message in messages))
         self.assertTrue(any("有 1 条卡密已售出，未执行删除" in message for message in messages))
 
+    def test_inventory_batch_delete_ignores_external_next_redirect(self):
+        self.client.force_login(self.owner)
+        available_card = CardCode.objects.filter(product=self.product, status=CardCode.Status.AVAILABLE).first()
+        response = self.client.post(
+            reverse("shop:merchant_inventory_batch_action"),
+            {"action": "delete", "card_code_ids": [available_card.id], "next": "https://evil.test/hijack"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("shop:merchant_inventory"))
+
+    def test_inventory_page_paginates_and_preserves_filters(self):
+        self.client.force_login(self.owner)
+        for index in range(60):
+            CardCode.objects.create(
+                product=self.product,
+                code=f"PAGE-CODE-{index:04d}",
+                note="page-test",
+            )
+
+        response = self.client.get(
+            reverse("shop:merchant_inventory"),
+            {"product": self.product.id, "status": CardCode.Status.AVAILABLE, "query": "page-test"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["is_paginated"])
+        self.assertEqual(response.context["page_obj"].number, 1)
+        self.assertEqual(response.context["page_obj"].paginator.count, 60)
+        self.assertEqual(len(response.context["card_codes"]), 50)
+        self.assertEqual(
+            response.context["pagination_query"],
+            f"product={self.product.id}&status={CardCode.Status.AVAILABLE}&query=page-test",
+        )
+        self.assertContains(response, f"product={self.product.id}&amp;status={CardCode.Status.AVAILABLE}&amp;query=page-test&amp;page=2")
+
+        second_page = self.client.get(
+            reverse("shop:merchant_inventory"),
+            {"product": self.product.id, "status": CardCode.Status.AVAILABLE, "query": "page-test", "page": 2},
+        )
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(second_page.context["page_obj"].number, 2)
+        self.assertEqual(len(second_page.context["card_codes"]), 10)
+
     def test_inventory_code_reveal_returns_plaintext_and_logs(self):
         self.client.force_login(self.owner)
         card = CardCode.objects.get(code_hash=CardCode.build_code_hash("OPS-CODE-0001"))
@@ -857,6 +953,14 @@ class AccountCenterEnhancementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.completed_order.order_no)
         self.assertNotContains(response, self.pending_order.order_no)
+
+    def test_account_center_rejects_overlong_query_without_filtering_orders(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("shop:account_center"), {"q": "x" * 121})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.completed_order.order_no)
+        self.assertContains(response, self.pending_order.order_no)
+        self.assertIn("q", response.context["filter_form"].errors)
 
     def test_account_center_shows_continue_payment_for_pending_order(self):
         self.client.force_login(self.user)
@@ -981,6 +1085,7 @@ class SupplierServiceTests(TestCase):
 
 class ReadinessChecksTests(TestCase):
     @override_settings(
+        SECRET_KEY="custom-secret-key",
         DEBUG=False,
         CARD_SECRET_KEY="test-card-secret",
         SITE_BASE_URL="https://staging.example.com",
@@ -998,6 +1103,28 @@ class ReadinessChecksTests(TestCase):
         result = run_readiness_checks()
         self.assertTrue(result["ok"])
         self.assertTrue(result["external_user_test_ready"])
+
+    @override_settings(SECRET_KEY="dev-insecure-secret-key")
+    def test_readiness_checks_warn_when_default_secret_key_is_in_use(self):
+        result = run_readiness_checks()
+        secret_check = next(check for check in result["checks"] if check["key"] == "django_secret_key")
+        self.assertEqual(secret_check["status"], "warn")
+        self.assertIn("默认 DJANGO_SECRET_KEY", secret_check["detail"])
+
+    @override_settings(SECRET_KEY="custom-secret-key", CARD_SECRET_KEY="")
+    def test_readiness_checks_warn_when_card_secret_falls_back_to_django_secret(self):
+        result = run_readiness_checks()
+        card_check = next(check for check in result["checks"] if check["key"] == "card_secret_key")
+        self.assertEqual(card_check["status"], "warn")
+        self.assertIn("历史卡密", card_check["detail"])
+        self.assertIn("DJANGO_SECRET_KEY", card_check["detail"])
+
+    @override_settings(SECRET_KEY="custom-secret-key", DEBUG=True, SITE_BASE_URL="https://staging.example.com")
+    def test_readiness_checks_warn_when_debug_mode_is_enabled_for_public_site(self):
+        result = run_readiness_checks()
+        debug_check = next(check for check in result["checks"] if check["key"] == "debug_mode")
+        self.assertEqual(debug_check["status"], "warn")
+        self.assertIn("公网开放", debug_check["detail"])
 
     @override_settings(
         DEBUG=False,

@@ -1,5 +1,44 @@
 # Deployment Guide
 
+## 2026-04 当前部署加固要求
+
+下面这几项为了保留“默认可启动”的开发体验，没有改成缺失即拒绝启动，但正式环境必须手动覆写：
+
+- `DJANGO_SECRET_KEY`
+- `CARD_SECRET_KEY`
+- `DJANGO_DEBUG=false`
+- `TRUSTED_PROXY_IPS`
+
+建议配合这两个检查一起看：
+
+- `python manage.py preflight_check`
+- `/health/readiness/`
+
+如果你把站点放到 Cloudflare Tunnel、Nginx、Traefik 或其它反向代理后面，`TRUSTED_PROXY_IPS` 必须填写真实可信代理 IP，否则应用不会信任转发头。
+
+## Docker 运行时要点
+
+- `web` 容器现在默认使用非 root 用户 `appuser`
+- Django 应用日志默认写入 `/app/runtime_logs/app.log`
+- `docker-compose.yml` 已为 `web` 挂载 `web_logs` volume 持久化日志
+
+常用命令：
+
+```bash
+docker compose --env-file .env.server logs -f web
+docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runtime_logs/app.log'
+docker compose --env-file .env.server exec -T web id -u
+```
+
+## 库存页分页
+
+库存卡密管理页现在支持标准分页：
+
+- 路径：`/dashboard/inventory/`
+- 参数：`page`
+- 默认：`50 / 页`
+- 翻页时会自动保留 `product`、`status`、`query` 筛选条件
+
 ## 目标
 
 把这台本地 Windows 电脑作为测试服务器，满足：
@@ -92,6 +131,8 @@ copy .env.server.example .env.server
 
 - `DJANGO_SECRET_KEY`
 - `CARD_SECRET_KEY`
+- `DJANGO_DEBUG=false`
+- `TRUSTED_PROXY_IPS`
 - `DATABASE_ENGINE=postgres`
 - `DATABASE_NAME`
 - `DATABASE_USER`

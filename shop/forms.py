@@ -12,6 +12,28 @@ class GuestOrderLookupForm(forms.Form):
     email = forms.EmailField(label="下单邮箱")
 
 
+class StorefrontSearchForm(forms.Form):
+    q = forms.CharField(label="搜索", required=False, max_length=120)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["q"].widget.attrs.update({"placeholder": "搜索商品名称、摘要或关键词"})
+
+
+class AccountOrderFilterForm(forms.Form):
+    q = forms.CharField(label="搜索", required=False, max_length=120)
+    status = forms.ChoiceField(label="订单状态", required=False)
+    payment_status = forms.ChoiceField(label="支付状态", required=False)
+    date_from = forms.DateField(label="开始日期", required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    date_to = forms.DateField(label="结束日期", required=False, widget=forms.DateInput(attrs={"type": "date"}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["q"].widget.attrs.update({"placeholder": "订单号 / 商品名 / 支付流水"})
+        self.fields["status"].choices = [("", "全部订单状态"), *Order.Status.choices]
+        self.fields["payment_status"].choices = [("", "全部支付状态"), *Order.PaymentStatus.choices]
+
+
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product

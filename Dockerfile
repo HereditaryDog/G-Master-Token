@@ -14,7 +14,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 
-RUN chmod +x /app/docker/web-entrypoint.sh
+RUN chmod +x /app/docker/web-entrypoint.sh \
+    && groupadd --system appuser \
+    && useradd --system --gid appuser --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /app/staticfiles /app/media /app/runtime_logs \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

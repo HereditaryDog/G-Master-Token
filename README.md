@@ -1,7 +1,7 @@
 # G-Master-Token
 
 面向数字点卡、Token 充值与自动发货场景的商城系统。  
-当前版本：`1.0.2`
+当前版本：`1.1.2`
 
 快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
@@ -72,6 +72,8 @@ cp .env.server.example .env.server
 
 - `DJANGO_SECRET_KEY`
 - `CARD_SECRET_KEY`
+- `DJANGO_DEBUG=false`
+- `TRUSTED_PROXY_IPS`
 - `DATABASE_PASSWORD`
 - `SITE_BASE_URL`
 - `EMAIL_HOST_USER`
@@ -114,6 +116,7 @@ python manage.py runserver
 - `web`：Django + Waitress
 - `db`：PostgreSQL 17
 - `cloudflared`：可选的 Cloudflare Tunnel connector
+- `web_logs`：持久化 Django 应用日志，默认写入 `/app/runtime_logs/app.log`
 
 启动命令：
 
@@ -126,6 +129,17 @@ docker compose --env-file .env.server up -d --build
 ```env
 CLOUDFLARE_TUNNEL_TOKEN=
 ```
+
+### 生产必须覆写
+
+下面 4 项当前为了保留开发便利性仍有默认行为，但正式环境必须手动覆写：
+
+- `DJANGO_SECRET_KEY`：必须换成独立随机值
+- `CARD_SECRET_KEY`：必须独立配置，不要继续回退到 `DJANGO_SECRET_KEY`
+- `DJANGO_DEBUG`：必须设为 `false`
+- `TRUSTED_PROXY_IPS`：如果前面挂了 Cloudflare Tunnel / Nginx / 网关代理，必须填入可信代理 IP
+
+如果遗漏这些配置，`/health/readiness/` 和 `python manage.py preflight_check` 会给出明确告警，但不会阻止本地开发启动。
 
 ### 公网访问
 
@@ -146,6 +160,9 @@ DJANGO_ALLOWED_HOSTS=*
 DJANGO_CSRF_TRUSTED_ORIGINS=https://gmtoken.shop,https://www.gmtoken.shop
 DJANGO_SECRET_KEY=
 CARD_SECRET_KEY=
+DJANGO_DEBUG=false
+TRUSTED_PROXY_IPS=198.41.192.0/21,2400:cb00::/32
+DJANGO_LOG_LEVEL=INFO
 ```
 
 ### 数据库
@@ -198,6 +215,15 @@ PARTNER_API_AUTH_HEADER=Authorization
 PARTNER_API_AUTH_SCHEME=Bearer
 PARTNER_TIMEOUT=20
 ```
+
+## 审计整改要点
+
+- 商家后台所有 `next` 跳转已统一校验，只允许站内安全地址，外部重定向会自动回退到默认页面
+- 密码修改与重置页面不再信任 `help_text|safe`，帮助文本会强制转义
+- 首页和账号中心的 GET 搜索已加 `max_length=120` 校验，超长输入只报错不执行过滤
+- 库存卡密页已改为标准分页，支持 `page` 参数，并保留商品 / 状态 / 关键词筛选条件
+- Docker `web` 容器已改为非 root 用户运行
+- Django 应用日志已写入 `/app/runtime_logs/app.log`，并通过 `web_logs` volume 持久化
 
 ## Stripe 接入
 
@@ -259,9 +285,11 @@ python manage.py loaddata data-migration.json
 ```bash
 python manage.py check
 python manage.py test accounts shop
+python manage.py preflight_check
 python manage.py verify_stripe_setup
 docker compose --env-file .env.server up -d --build
 docker compose --env-file .env.server logs -f web
+docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runtime_logs/app.log'
 ```
 
 ## 常用入口
@@ -277,7 +305,7 @@ docker compose --env-file .env.server logs -f web
 
 ## 当前发布状态
 
-`1.0.2` 版本已经完成以下关键链路：
+`1.1.2` 版本已经完成以下关键链路：
 
 - Stripe 测试支付已接通
 - Webhook 回调地址已固定为公网 HTTPS 域名
@@ -286,7 +314,10 @@ docker compose --env-file .env.server logs -f web
 - Docker + PostgreSQL + Cloudflare Tunnel 已跑通
 - 支付配置、供货配置、数据库配置均已环境变量化
 - 商家后台商品管理已支持批量上架、批量下架与软删除
-- 库存卡密页已支持库存概览、按商品筛选和批量删除可售卡密
+- 库存卡密页已支持库存概览、按商品筛选、标准分页和批量删除可售卡密
+- 商家后台危险跳转参数已收口为站内安全跳转
+- Docker 默认以非 root 运行，并持久化应用日志
+- readiness / preflight 对 `DJANGO_SECRET_KEY`、`CARD_SECRET_KEY`、`DEBUG` 风险提示更明确
 
 ## 路线图
 

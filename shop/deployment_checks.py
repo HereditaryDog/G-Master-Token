@@ -114,13 +114,29 @@ def _debug_check():
             key="debug_mode",
             label="调试模式",
             status="warn",
-            detail="DEBUG=True，仅适合本地或受控测试环境。",
+            detail="DEBUG=True，仅适合本地或受控测试环境。若站点已对公网开放，调试页面和敏感配置有暴露风险。",
         )
     return ReadinessCheck(
         key="debug_mode",
         label="调试模式",
         status="pass",
         detail="DEBUG=False",
+    )
+
+
+def _secret_key_check():
+    if settings.SECRET_KEY == settings.INSECURE_DEFAULT_SECRET_KEY:
+        return ReadinessCheck(
+            key="django_secret_key",
+            label="Django 密钥",
+            status="warn",
+            detail="当前仍在使用默认 DJANGO_SECRET_KEY。生产环境必须覆写，否则会话签名与安全令牌存在已知风险。",
+        )
+    return ReadinessCheck(
+        key="django_secret_key",
+        label="Django 密钥",
+        status="pass",
+        detail="已配置自定义 DJANGO_SECRET_KEY",
     )
 
 
@@ -136,7 +152,7 @@ def _card_secret_check():
         key="card_secret_key",
         label="卡密加密密钥",
         status="warn",
-        detail="未配置独立 CARD_SECRET_KEY，当前回退到 DJANGO_SECRET_KEY。",
+        detail="未配置独立 CARD_SECRET_KEY，当前回退到 DJANGO_SECRET_KEY。若 Django 密钥泄露，历史卡密存在被批量解密风险。",
     )
 
 
@@ -275,6 +291,7 @@ def run_readiness_checks():
     checks = [
         _database_connection_check(),
         _migration_check(),
+        _secret_key_check(),
         _debug_check(),
         _card_secret_check(),
         _site_base_url_check(),

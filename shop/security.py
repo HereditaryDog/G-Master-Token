@@ -3,8 +3,10 @@ import hashlib
 import hmac
 
 from cryptography.fernet import Fernet
-from django.core import signing
 from django.conf import settings
+from django.core import signing
+from django.core.exceptions import DisallowedHost
+from django.utils.http import url_has_allowed_host_and_scheme
 
 
 def _key_material():
@@ -70,6 +72,26 @@ def is_request_ip_allowed(request, allowlist):
     if not allowlist:
         return True
     return get_request_ip(request) in allowlist
+
+
+def get_safe_next_url(request, target, fallback):
+    candidate = (target or "").strip()
+    if not candidate:
+        return fallback
+
+    try:
+        current_host = request.get_host()
+    except DisallowedHost:
+        current_host = ""
+
+    allowed_hosts = {host for host in [current_host, *getattr(settings, "ALLOWED_HOSTS", [])] if host}
+    if url_has_allowed_host_and_scheme(
+        candidate,
+        allowed_hosts=allowed_hosts,
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return fallback
 
 
 def is_merchant_user(user):

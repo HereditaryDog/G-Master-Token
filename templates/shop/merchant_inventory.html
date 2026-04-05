@@ -279,6 +279,20 @@
                     </tbody>
                 </table>
             </div>
+            {% if is_paginated %}
+                <div class="pagination-bar">
+                    <span class="muted">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页，共 {{ page_obj.paginator.count }} 条记录</span>
+                    <div class="pagination-bar__actions">
+                        {% if page_obj.has_previous %}
+                            <a class="ghost-button" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+                        {% endif %}
+                        <span class="pagination-bar__current">第 {{ page_obj.number }} 页</span>
+                        {% if page_obj.has_next %}
+                            <a class="ghost-button" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
         </section>
 
         <section class="content-card soft">

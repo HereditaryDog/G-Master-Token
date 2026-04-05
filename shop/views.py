@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core import signing
 from django.core.mail import send_mail
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -16,9 +17,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import CreateView, DetailView, FormView, ListView, TemplateView, UpdateView
 
 from .forms import (
+    AccountOrderFilterForm,
     AddToCartForm,
     CardCodeBatchForm,
     GuestOrderLookupForm,
+    StorefrontSearchForm,
     MerchantInventoryFilterForm,
     MerchantOrderFilterForm,
     MerchantProductFilterForm,
@@ -44,6 +47,7 @@ from .models import (
 from .deployment_checks import run_readiness_checks
 from .security import (
     build_guest_order_access_token,
+    get_safe_next_url,
     get_request_ip,
     is_merchant_user,
     is_request_ip_allowed,
@@ -216,21 +220,28 @@ class StorefrontView(ListView):
     template_name = "shop/storefront.html"
     context_object_name = "products"
 
+    def get_search_form(self):
+        if not hasattr(self, "_search_form"):
+            self._search_form = StorefrontSearchForm(self.request.GET or None)
+        return self._search_form
+
     def get_queryset(self):
         queryset = Product.objects.filter(is_active=True, is_deleted=False).select_related("category")
-        keyword = self.request.GET.get("q", "").strip()
-        if keyword:
-            queryset = queryset.filter(
-                Q(title__icontains=keyword)
-                | Q(summary__icontains=keyword)
-                | Q(description__icontains=keyword)
-            )
+        form = self.get_search_form()
+        if form.is_valid():
+            keyword = form.cleaned_data["q"]
+            if keyword:
+                queryset = queryset.filter(
+                    Q(title__icontains=keyword)
+                    | Q(summary__icontains=keyword)
+                    | Q(description__icontains=keyword)
+                )
         return queryset.order_by("-is_featured", "price")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["announcements"] = SiteAnnouncement.objects.filter(is_active=True)[:5]
-        context["keyword"] = self.request.GET.get("q", "").strip()
+        context["search_form"] = self.get_search_form()
         return context
 
 
@@ -556,46 +567,45 @@ class HelpArticleDetailView(DetailView):
 class AccountCenterView(LoginRequiredMixin, TemplateView):
     template_name = "shop/account_center.html"
 
+    def get_filter_form(self):
+        if not hasattr(self, "_filter_form"):
+            self._filter_form = AccountOrderFilterForm(self.request.GET or None)
+        return self._filter_form
+
     def get_filtered_orders(self):
         queryset = (
             self.request.user.orders.select_related("user")
             .prefetch_related("items__product", "items__deliveries")
             .order_by("-created_at")
         )
-        query = self.request.GET.get("q", "").strip()
-        status = self.request.GET.get("status", "").strip()
-        payment_status = self.request.GET.get("payment_status", "").strip()
-        date_from = self.request.GET.get("date_from", "").strip()
-        date_to = self.request.GET.get("date_to", "").strip()
-        if query:
-            queryset = queryset.filter(
-                Q(order_no__icontains=query)
-                | Q(items__product_title__icontains=query)
-                | Q(payment_reference__icontains=query)
-            ).distinct()
-        valid_statuses = {choice[0] for choice in Order.Status.choices}
-        if status in valid_statuses:
-            queryset = queryset.filter(status=status)
-        valid_payment_statuses = {choice[0] for choice in Order.PaymentStatus.choices}
-        if payment_status in valid_payment_statuses:
-            queryset = queryset.filter(payment_status=payment_status)
-        if date_from:
-            queryset = queryset.filter(created_at__date__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(created_at__date__lte=date_to)
+        form = self.get_filter_form()
+        if form.is_valid():
+            query = form.cleaned_data["q"]
+            status = form.cleaned_data["status"]
+            payment_status = form.cleaned_data["payment_status"]
+            date_from = form.cleaned_data["date_from"]
+            date_to = form.cleaned_data["date_to"]
+            if query:
+                queryset = queryset.filter(
+                    Q(order_no__icontains=query)
+                    | Q(items__product_title__icontains=query)
+                    | Q(payment_reference__icontains=query)
+                ).distinct()
+            if status:
+                queryset = queryset.filter(status=status)
+            if payment_status:
+                queryset = queryset.filter(payment_status=payment_status)
+            if date_from:
+                queryset = queryset.filter(created_at__date__gte=date_from)
+            if date_to:
+                queryset = queryset.filter(created_at__date__lte=date_to)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["orders"] = self.get_filtered_orders()
         context["recent_support_tickets"] = self.request.user.support_tickets.order_by("-last_message_at")[:5]
-        context["status_choices"] = Order.Status.choices
-        context["payment_status_choices"] = Order.PaymentStatus.choices
-        context["current_query"] = self.request.GET.get("q", "").strip()
-        context["current_status"] = self.request.GET.get("status", "").strip()
-        context["current_payment_status"] = self.request.GET.get("payment_status", "").strip()
-        context["current_date_from"] = self.request.GET.get("date_from", "").strip()
-        context["current_date_to"] = self.request.GET.get("date_to", "").strip()
+        context["filter_form"] = self.get_filter_form()
         return context
 
 
@@ -786,12 +796,12 @@ class MerchantProductToggleStatusView(MerchantRequiredMixin, View):
         product.save(update_fields=["is_active", "updated_at"])
         state_label = "上架" if product.is_active else "下架"
         messages.success(request, f"{product.title} 已切换为{state_label}状态。")
-        return redirect(request.POST.get("next") or reverse("shop:merchant_products"))
+        return redirect(get_safe_next_url(request, request.POST.get("next"), reverse("shop:merchant_products")))
 
 
 class MerchantProductBatchActionView(MerchantRequiredMixin, View):
     def post(self, request, *args, **kwargs):
-        next_url = request.POST.get("next") or reverse("shop:merchant_products")
+        next_url = get_safe_next_url(request, request.POST.get("next"), reverse("shop:merchant_products"))
         selected_ids = []
         for raw_id in request.POST.getlist("product_ids"):
             try:
@@ -913,6 +923,10 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
             total_count=Count("card_codes", distinct=True),
         ).order_by("-available_count", "title")
 
+    def get_page_obj(self, inventory_queryset):
+        paginator = Paginator(inventory_queryset, 50)
+        return paginator.get_page(self.request.GET.get("page") or 1)
+
     def form_valid(self, form):
         product = form.cleaned_data["product"]
         note = form.cleaned_data["note"]
@@ -955,12 +969,15 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         inventory_queryset = self.get_inventory_queryset()
+        page_obj = self.get_page_obj(inventory_queryset)
         filter_form = self.get_filter_form()
         selected_product = None
         if filter_form.is_valid():
             selected_product = filter_form.cleaned_data["product"]
         inventory_products = self.get_inventory_products()
-        context["card_codes"] = inventory_queryset[:100]
+        query_params = self.request.GET.copy()
+        query_params.pop("page", None)
+        context["card_codes"] = page_obj.object_list
         context["products"] = inventory_products
         context["filter_form"] = filter_form
         context["current_product_id"] = str(selected_product.id) if selected_product else ""
@@ -983,6 +1000,9 @@ class MerchantInventoryView(MerchantContextMixin, FormView):
             ).count(),
             "filtered_count": inventory_queryset.count(),
         }
+        context["page_obj"] = page_obj
+        context["is_paginated"] = page_obj.paginator.num_pages > 1
+        context["pagination_query"] = query_params.urlencode()
         return context
 
 
@@ -1002,7 +1022,7 @@ class MerchantInventoryCodeRevealView(MerchantRequiredMixin, View):
 
 class MerchantInventoryBatchActionView(MerchantRequiredMixin, View):
     def post(self, request, *args, **kwargs):
-        next_url = request.POST.get("next") or reverse("shop:merchant_inventory")
+        next_url = get_safe_next_url(request, request.POST.get("next"), reverse("shop:merchant_inventory"))
         selected_ids = []
         for raw_id in request.POST.getlist("card_code_ids"):
             try:
@@ -1088,7 +1108,11 @@ class MerchantOrderActionView(MerchantRequiredMixin, View):
             Order.objects.select_related("user").prefetch_related("items__deliveries"),
             order_no=order_no,
         )
-        next_url = request.POST.get("next") or reverse("shop:merchant_order_detail", args=[order.order_no])
+        next_url = get_safe_next_url(
+            request,
+            request.POST.get("next"),
+            reverse("shop:merchant_order_detail", args=[order.order_no]),
+        )
         action = request.POST.get("action", "").strip()
 
         if action == "mark_failed":

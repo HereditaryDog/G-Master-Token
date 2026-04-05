@@ -34,6 +34,8 @@ services:
       DATABASE_PORT: 5432
     ports:
       - "${APP_PORT:-8000}:8000"
+    volumes:
+      - web_logs:/app/runtime_logs
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/').read()\""]
       interval: 20s
@@ -56,3 +58,4 @@ services:
 
 volumes:
   postgres_data:
+  web_logs:

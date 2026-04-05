@@ -57,33 +57,26 @@
         <form method="get" class="filter-toolbar">
             <label class="field">
                 <span>搜索</span>
-                <input type="text" name="q" value="{{ current_query }}" placeholder="订单号 / 商品名 / 支付流水">
+                {{ filter_form.q }}
+                {% if filter_form.q.errors %}
+                    <small class="error-text">{{ filter_form.q.errors|join:", " }}</small>
+                {% endif %}
             </label>
             <label class="field">
                 <span>订单状态</span>
-                <select name="status">
-                    <option value="">全部订单状态</option>
-                    {% for value, label in status_choices %}
-                        <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                {{ filter_form.status }}
             </label>
             <label class="field">
                 <span>支付状态</span>
-                <select name="payment_status">
-                    <option value="">全部支付状态</option>
-                    {% for value, label in payment_status_choices %}
-                        <option value="{{ value }}" {% if current_payment_status == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
+                {{ filter_form.payment_status }}
             </label>
             <label class="field">
                 <span>开始日期</span>
-                <input type="date" name="date_from" value="{{ current_date_from }}">
+                {{ filter_form.date_from }}
             </label>
             <label class="field">
                 <span>结束日期</span>
-                <input type="date" name="date_to" value="{{ current_date_to }}">
+                {{ filter_form.date_to }}
             </label>
             <div class="filter-toolbar__actions">
                 <button type="submit" class="primary-button">筛选订单</button>

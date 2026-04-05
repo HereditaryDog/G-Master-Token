@@ -18,9 +18,12 @@
                         <a class="ghost-button" href="{% url 'shop:order_lookup' %}">订单查询</a>
                     </div>
                     <form method="get" class="search-bar search-bar--hero hero-search-bar">
-                        <input type="text" name="q" value="{{ keyword }}" placeholder="搜索商品名称、摘要或关键词">
+                        {{ search_form.q }}
                         <button type="submit" class="primary-button">搜索</button>
                     </form>
+                    {% if search_form.q.errors %}
+                        <small class="error-text">{{ search_form.q.errors|join:", " }}</small>
+                    {% endif %}
                 </div>
             </div>
             <aside class="hero-spotlight hero-spotlight--brand">
