@@ -53,7 +53,7 @@ http://rog-i7-2070.tailfada64.ts.net:8001/
 
 你和同事当前共用同一个 GitHub 仓库：
 
-- [https://github.com/HereditaryDog/web_0.0.1](https://github.com/HereditaryDog/web_0.0.1)
+- [https://github.com/HereditaryDog/G-Master-Token](https://github.com/HereditaryDog/G-Master-Token)
 
 当前测试机已经配置：
 

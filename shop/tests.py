@@ -24,6 +24,7 @@ from shop.models import (
 )
 from shop.services.order_flow import create_single_item_order, mark_order_checkout_created, mark_order_paid
 from shop.services.payment import get_default_gateway_code, list_active_payment_gateways, list_reserved_payment_gateways
+from shop.services.supplier import request_partner_tokens
 
 
 class StoreOrderFlowTests(TestCase):
@@ -152,6 +153,15 @@ class StoreOrderFlowTests(TestCase):
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(order.status, Order.Status.FAILED)
         self.assertEqual(DeliveryRecord.objects.filter(order_item__order=order).count(), 0)
+
+    @override_settings(PAYMENT_ENABLE_MOCK_GATEWAY=False)
+    def test_mock_payment_route_returns_404_when_gateway_disabled(self):
+        client = Client()
+        self.assertTrue(client.login(username="buyer", password="Buyer123!"))
+        order = create_single_item_order(self.buyer, self.product, 1)
+
+        response = client.get(reverse("shop:mock_pay", args=[order.order_no]))
+        self.assertEqual(response.status_code, 404)
 
     def test_guest_order_lookup_works_with_order_number_and_email(self):
         client = Client()
@@ -809,6 +819,52 @@ class StaticAssetTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/css; charset=\"utf-8\"")
         self.assertContains(response, ".page-shell")
+
+
+class SupplierServiceTests(TestCase):
+    def setUp(self):
+        self.category = ProductCategory.objects.create(name="供货分类", slug="supplier-category")
+        self.product = Product.objects.create(
+            category=self.category,
+            title="Supplier Token",
+            slug="supplier-token",
+            summary="合作供货商品",
+            description="合作供货商品详情",
+            face_value="10.00",
+            token_amount=100000,
+            price="18.00",
+            delivery_method=Product.DeliveryMethod.PARTNER_API,
+            provider_sku="SKU-001",
+            is_active=True,
+        )
+
+    @override_settings(
+        PARTNER_API_BASE_URL="https://partner.example.com/api",
+        PARTNER_API_KEY="partner-token",
+        PARTNER_API_FULFILL_PATH="v2/fulfill",
+        PARTNER_API_AUTH_HEADER="X-Partner-Token",
+        PARTNER_API_AUTH_SCHEME="",
+        PARTNER_TIMEOUT=12,
+    )
+    @patch("shop.services.supplier.requests.post")
+    def test_partner_request_uses_env_configurable_path_and_header(self, mock_post):
+        mock_response = mock_post.return_value
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"tokens": [{"code": "TOKEN-001"}]}
+
+        tokens = request_partner_tokens(self.product, 1, "OD202604050001")
+
+        self.assertEqual(tokens, [{"code": "TOKEN-001"}])
+        mock_post.assert_called_once_with(
+            "https://partner.example.com/api/v2/fulfill",
+            json={
+                "order_no": "OD202604050001",
+                "sku": "SKU-001",
+                "quantity": 1,
+            },
+            headers={"X-Partner-Token": "partner-token"},
+            timeout=12,
+        )
 
 
 class ReadinessChecksTests(TestCase):

@@ -19,7 +19,7 @@
                             {{ field }}
                             <button type="button" class="ghost-button" id="send-code-button">发送验证码</button>
                         </div>
-                        <small class="muted" id="send-code-status">验证码会发送到你填写的邮箱地址。</small>
+                        <small class="muted" id="send-code-status">{{ signup_code_initial_hint }}</small>
                     {% else %}
                         {{ field }}
                     {% endif %}

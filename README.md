@@ -1,51 +1,264 @@
-# G-MasterToken
+# G-Master-Token
 
-数字点卡与 Token 充值站点。  
-当前包含前台商城、用户系统、订单查询、商家后台、自动发货、Stripe 支付链路和基础安全加固。
+面向数字点卡、Token 充值与自动发货场景的商城系统。  
+当前版本：`1.0.0`
 
-当前版本：`0.1.11`
+快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
-## 快速启动
+## 项目简介
+
+G-Master-Token 是一套基于 Django 的完整商城与交付系统，覆盖：
+
+- 前台商城、商品搜索、下单与订单查询
+- 用户注册登录、邮箱验证码、账号中心
+- 商家后台、库存卡密、订单处理与客服工单
+- Stripe Checkout + Webhook 自动确认支付
+- 库存卡密 / 合作 API 两种发货模式
+- PostgreSQL、Docker、Cloudflare Tunnel、Gmail SMTP
+
+这套仓库适合用作：
+
+- 海外支付测试站
+- 数字商品自动发货站
+- Token / 点卡 / 会员兑换类商城底座
+- 需要快速搭建“下单 - 支付 - 发货 - 查单”闭环的测试环境
+
+## 核心能力
+
+### 商城与订单
+
+- 商品展示、关键词搜索、详情页与相关商品推荐
+- 登录用户快速下单，自动生成订单与支付记录
+- 订单详情、支付结果页、账号中心订单管理
+- 访客可通过订单号 + 邮箱查询订单
+
+### 支付与发货
+
+- 已接入 Stripe Checkout 跳转支付
+- 已接入 Stripe Webhook：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`
+- 支持库存卡密自动发货
+- 支持合作 API 自动供货，路径、鉴权头和鉴权方案均可通过环境变量配置
+
+### 用户与后台
+
+- 普通用户登录 / 注册 / 邮箱验证码
+- 独立商家登录页与商家后台
+- 工单系统、订单跟进、发货重试
+- Django Admin 高级后台
+
+### 安全与运维
+
+- 登录、注册发码、订单查询等关键入口已加入验证码与限流
+- 支持后台 IP 白名单、可信代理 IP 识别
+- Docker + PostgreSQL 部署
+- Cloudflare Tunnel 公网接入
+- Gmail SMTP 邮件发送
+- `/health/` 与 `/health/readiness/` 可直接用于巡检
+
+## 快速开始
+
+### 方式一：Docker 部署（推荐）
+
+```bash
+git clone https://github.com/HereditaryDog/G-Master-Token.git
+cd G-Master-Token
+cp .env.server.example .env.server
+```
+
+先编辑 `.env.server`，至少填好：
+
+- `DJANGO_SECRET_KEY`
+- `CARD_SECRET_KEY`
+- `DATABASE_PASSWORD`
+- `SITE_BASE_URL`
+- `EMAIL_HOST_USER`
+- `EMAIL_HOST_PASSWORD`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PUBLISHABLE_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+
+然后启动：
+
+```bash
+docker compose --env-file .env.server up -d --build
+docker compose --env-file .env.server exec -T web python manage.py migrate
+docker compose --env-file .env.server exec -T web python manage.py seed_demo_store
+```
+
+### 方式二：本地开发
 
 ```bash
 python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+```
+
+默认建议也使用 PostgreSQL：
+
+```bash
 python manage.py migrate
 python manage.py seed_demo_store
 python manage.py runserver
 ```
 
-Windows 也可以直接用：
+## 部署方式
 
-```powershell
-.\Start-WebStore.ps1
-```
+### Docker Compose
 
-## Docker
+项目自带 [docker-compose.yml](./docker-compose.yml)，包含：
 
-```powershell
+- `web`：Django + Waitress
+- `db`：PostgreSQL 17
+- `cloudflared`：可选的 Cloudflare Tunnel connector
+
+启动命令：
+
+```bash
 docker compose --env-file .env.server up -d --build
 ```
 
-## 关键配置
+如果使用 Cloudflare Tunnel，可在 `.env.server` 中填入：
 
-最少关注这些：
+```env
+CLOUDFLARE_TUNNEL_TOKEN=
+```
+
+### 公网访问
+
+当前推荐使用 Cloudflare Tunnel，而不是临时端口映射或随机隧道：
+
+- 域名固定
+- 不需要直暴露本机端口
+- 方便 Stripe webhook 与外部联调
+
+## 关键环境变量
+
+### 站点与安全
 
 ```env
 SITE_NAME=G-MasterToken
-SITE_BASE_URL=
+SITE_BASE_URL=https://gmtoken.shop
+DJANGO_ALLOWED_HOSTS=*
+DJANGO_CSRF_TRUSTED_ORIGINS=https://gmtoken.shop,https://www.gmtoken.shop
+DJANGO_SECRET_KEY=
 CARD_SECRET_KEY=
-STRIPE_SECRET_KEY=
-STRIPE_PUBLISHABLE_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_CURRENCY=cny
 ```
 
-Stripe 配置检查：
+### 数据库
+
+```env
+DATABASE_ENGINE=postgres
+DATABASE_NAME=web_store
+DATABASE_USER=postgres
+DATABASE_PASSWORD=
+DATABASE_HOST=db
+DATABASE_PORT=5432
+DATABASE_CONN_MAX_AGE=60
+```
+
+### 邮件（Gmail SMTP）
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+DEFAULT_FROM_EMAIL=G-MasterToken <your@gmail.com>
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+EMAIL_USE_TLS=true
+EMAIL_USE_SSL=false
+```
+
+### Stripe 支付
+
+```env
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_CURRENCY=cny
+PAYMENT_ENABLE_MOCK_GATEWAY=false
+PAYMENT_ENABLE_STRIPE_GATEWAY=true
+PAYMENT_ENABLE_ALIPAY_GATEWAY=false
+PAYMENT_ENABLE_WECHAT_GATEWAY=false
+PAYMENT_ENABLE_USDT_GATEWAY=false
+PAYMENT_ENABLE_BANK_GATEWAY=false
+```
+
+### 合作供货接口
+
+```env
+PARTNER_API_BASE_URL=https://partner.example.com/api
+PARTNER_API_KEY=partner-token
+PARTNER_API_FULFILL_PATH=/fulfill
+PARTNER_API_AUTH_HEADER=Authorization
+PARTNER_API_AUTH_SCHEME=Bearer
+PARTNER_TIMEOUT=20
+```
+
+## Stripe 接入
+
+项目当前使用 Stripe Checkout 跳转支付，Webhook 入口为：
+
+```text
+https://your-domain/webhooks/stripe/
+```
+
+建议在 Stripe 后台订阅以下事件：
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
+- `checkout.session.expired`
+
+配置完成后可以直接检查：
 
 ```bash
 python manage.py verify_stripe_setup
+python manage.py verify_stripe_setup --json
+```
+
+## PostgreSQL 迁移
+
+如果你之前的旧环境仍在使用 SQLite，可以按下面步骤迁移到 PostgreSQL。
+
+先导出：
+
+```bash
+python manage.py dumpdata \
+  --natural-foreign \
+  --natural-primary \
+  --exclude contenttypes \
+  --exclude auth.permission \
+  > data-migration.json
+```
+
+然后把数据库环境变量改成 PostgreSQL：
+
+```env
+DATABASE_ENGINE=postgres
+DATABASE_NAME=web_store
+DATABASE_USER=postgres
+DATABASE_PASSWORD=change-me
+DATABASE_HOST=127.0.0.1
+DATABASE_PORT=5432
+```
+
+再执行：
+
+```bash
+python manage.py migrate
+python manage.py loaddata data-migration.json
+```
+
+## 常用命令
+
+```bash
+python manage.py check
+python manage.py test accounts shop
+python manage.py verify_stripe_setup
+docker compose --env-file .env.server up -d --build
+docker compose --env-file .env.server logs -f web
 ```
 
 ## 常用入口
@@ -55,24 +268,29 @@ python manage.py verify_stripe_setup
 - 商家登录：`/accounts/merchant/login/`
 - 商家后台：`/dashboard/`
 - 订单查询：`/order-lookup/`
+- 管理后台：`/admin/`
+- 健康检查：`/health/`
 - 就绪检查：`/health/readiness/`
 
-## 当前状态
+## 当前发布状态
 
-- 前后台主流程可跑
-- Docker 可跑
-- Stripe Checkout / webhook 主链路已接入
-- 登录、发码、查单已加服务端验证码与限流
-- 账号中心支持对待支付订单直接继续支付
-- 注册页已加入手机号格式校验
-- 商家 2FA 预留，尚未完成
-- 真实供应 API 尚未正式接入
+`1.0.0` 版本已经完成以下关键链路：
 
-## 验证
+- Stripe 测试支付已接通
+- Webhook 回调地址已固定为公网 HTTPS 域名
+- 模拟支付已关闭，测试站默认只走 Stripe
+- Gmail SMTP 已接通
+- Docker + PostgreSQL + Cloudflare Tunnel 已跑通
+- 支付配置、供货配置、数据库配置均已环境变量化
 
-```bash
-python manage.py check
-python manage.py test accounts shop
-```
+## 路线图
 
-更多变更见 [CHANGELOG.md](CHANGELOG.md)。
+- 接入支付宝 / 微信支付 / USDT / 银行转账
+- 完成商家 2FA
+- 接入正式合作供货 API
+- 补充更细的运维监控和告警
+- 拆分更完整的管理员与商家权限层
+
+## 更新日志
+
+完整发布记录见 [CHANGELOG.md](./CHANGELOG.md)。

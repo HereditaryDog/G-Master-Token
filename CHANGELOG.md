@@ -2,6 +2,38 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.0.0 - 2026-04-05
+
+### Added
+
+- 新增 Gmail SMTP 发信配置，注册验证码与系统邮件可切到真实邮箱投递
+- 新增 Cloudflare Tunnel 正式公网接入流程，测试域名与 Stripe webhook 可稳定联通
+- 新增合作供货接口环境变量：`PARTNER_API_FULFILL_PATH`、`PARTNER_API_AUTH_HEADER`、`PARTNER_API_AUTH_SCHEME`
+- 新增 mock 支付关闭状态下的直链保护与对应回归测试
+
+### Changed
+
+- 仓库发布版本正式提升为 `1.0.0`
+- README 全量重写为正式发布文档风格，统一收口快速开始、部署、环境变量、Stripe 接入与 PostgreSQL 迁移说明
+- 默认部署配置统一切换到 PostgreSQL 方案，示例环境文件同步更新
+- 测试站支付通道正式切换为仅 Stripe，关闭模拟支付
+- 首页品牌资源、favicon、页头页脚品牌展示完成统一
+
+### Fixed
+
+- 修复测试环境邮箱验证码提示与实际投递能力不一致的问题
+- 修复 Cloudflare Tunnel 双 connector 并存导致公网访问间歇性 `502` 的问题
+- 修复 mock 支付在禁用后仍可通过旧直链访问的问题
+- 修复合作供货接口路径与鉴权方式写死在代码中的问题
+
+### Verified
+
+- `python manage.py check`
+- `python manage.py verify_stripe_setup --json`
+- `python manage.py test shop.tests.SupplierServiceTests shop.tests.ReadinessChecksTests`
+- `python manage.py test shop.tests.StoreOrderFlowTests.test_mock_payment_route_returns_404_when_gateway_disabled shop.tests.StoreOrderFlowTests.test_mock_payment_completes_order_and_delivers_code`
+- `https://gmtoken.shop/health/`
+
 ## 0.1.11 - 2026-03-29
 
 ### Changed

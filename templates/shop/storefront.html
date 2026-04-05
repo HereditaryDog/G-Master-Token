@@ -27,10 +27,10 @@
                 <div class="hero-brand-frame">
                     <div class="hero-brand-mark">G</div>
                     <div class="hero-brand-chip-grid">
-                        <span class="hero-brand-chip hero-brand-chip--primary">自动发卡</span>
-                        <span class="hero-brand-chip">订单查询</span>
-                        <span class="hero-brand-chip">库存卡密</span>
-                        <span class="hero-brand-chip">支付结果</span>
+                        <a class="hero-brand-chip hero-brand-chip--primary" href="#products">自动发卡</a>
+                        <a class="hero-brand-chip" href="{% url 'shop:order_lookup' %}">订单查询</a>
+                        <a class="hero-brand-chip" href="{% url 'accounts:merchant_login' %}?next={% url 'shop:merchant_inventory' %}">库存卡密</a>
+                        <a class="hero-brand-chip" href="{% url 'shop:order_lookup' %}#payment-result">支付结果</a>
                     </div>
                 </div>
             </aside>

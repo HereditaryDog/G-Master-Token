@@ -30,6 +30,7 @@ from .models import User
 from .rate_limits import consume_request
 from .utils import (
     build_signup_code_response_payload,
+    get_signup_code_delivery_meta,
     refresh_login_captcha,
     normalize_email_address,
     send_signup_email_code,
@@ -43,6 +44,13 @@ class SignUpView(CreateView):
     form_class = SignUpForm
     template_name = "accounts/signup.html"
     success_url = reverse_lazy("shop:storefront")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        delivery_meta = get_signup_code_delivery_meta()
+        context["signup_code_delivery_mode"] = delivery_meta["delivery_mode"]
+        context["signup_code_initial_hint"] = delivery_meta["initial_hint"]
+        return context
 
     def form_valid(self, form):
         response = super().form_valid(form)

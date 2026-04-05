@@ -254,11 +254,14 @@ def _stripe_checkout_check():
 
 def _partner_api_check():
     if settings.PARTNER_API_BASE_URL and settings.PARTNER_API_KEY:
+        path = settings.PARTNER_API_FULFILL_PATH.strip() or "/fulfill"
+        if not path.startswith("/"):
+            path = f"/{path}"
         return ReadinessCheck(
             key="partner_api",
             label="供货接口",
             status="pass",
-            detail=settings.PARTNER_API_BASE_URL,
+            detail=f"{settings.PARTNER_API_BASE_URL.rstrip('/')}{path}",
         )
     return ReadinessCheck(
         key="partner_api",

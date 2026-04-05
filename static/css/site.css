@@ -138,6 +138,13 @@ select {
     letter-spacing: -0.055em;
 }
 
+.brand-logo {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 6px 12px rgba(8, 44, 43, 0.12));
+}
+
 .brand-dot {
     width: 13px;
     height: 13px;
@@ -2886,6 +2893,16 @@ tbody tr:hover td {
     font-size: 0.94rem;
     font-weight: 700;
     letter-spacing: -0.018em;
+    text-decoration: none;
+    transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.hero-brand-chip:hover,
+.hero-brand-chip:focus-visible {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    transform: translateY(-1px);
 }
 
 .hero-brand-chip--primary {

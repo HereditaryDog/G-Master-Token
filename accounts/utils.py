@@ -148,16 +148,27 @@ def send_signup_email_code(email):
     return verification
 
 
+def get_signup_code_delivery_meta():
+    if settings.EMAIL_BACKEND in LOCAL_EMAIL_BACKENDS:
+        return {
+            "delivery_mode": "local_mail",
+            "message": "验证码已生成，但当前测试站未配置真实邮件发送，所以不会投递到你的邮箱。",
+            "initial_hint": "当前测试站未配置真实邮件发送，点击后验证码只会写入服务器日志，不会投递到真实邮箱。",
+        }
+    return {
+        "delivery_mode": "email",
+        "message": "验证码已发送，请查收邮箱。",
+        "initial_hint": "验证码会发送到你填写的邮箱地址。",
+    }
+
+
 def build_signup_code_response_payload(verification):
+    delivery_meta = get_signup_code_delivery_meta()
     payload = {
         "ok": True,
-        "message": "验证码已发送，请查收邮箱。",
+        "message": delivery_meta["message"],
         "cooldown_seconds": settings.EMAIL_CODE_COOLDOWN_SECONDS,
         "expiry_minutes": settings.EMAIL_CODE_EXPIRY_MINUTES,
+        "delivery_mode": delivery_meta["delivery_mode"],
     }
-    if settings.DEBUG and settings.EMAIL_BACKEND in LOCAL_EMAIL_BACKENDS:
-        payload["message"] = "验证码已生成，请检查本地邮件输出。"
-        payload["delivery_mode"] = "local_mail"
-    else:
-        payload["delivery_mode"] = "email"
     return payload

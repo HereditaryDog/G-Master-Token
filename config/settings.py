@@ -52,6 +52,9 @@ BANK_ACCOUNT_NUMBER = os.getenv("BANK_ACCOUNT_NUMBER", "")
 BANK_SWIFT_CODE = os.getenv("BANK_SWIFT_CODE", "")
 PARTNER_API_BASE_URL = os.getenv("PARTNER_API_BASE_URL", "")
 PARTNER_API_KEY = os.getenv("PARTNER_API_KEY", "")
+PARTNER_API_FULFILL_PATH = os.getenv("PARTNER_API_FULFILL_PATH", "/fulfill").strip() or "/fulfill"
+PARTNER_API_AUTH_HEADER = os.getenv("PARTNER_API_AUTH_HEADER", "Authorization").strip() or "Authorization"
+PARTNER_API_AUTH_SCHEME = os.getenv("PARTNER_API_AUTH_SCHEME", "Bearer").strip()
 PARTNER_TIMEOUT = int(os.getenv("PARTNER_TIMEOUT", "20"))
 USE_POSTGRES = os.getenv("DATABASE_ENGINE", "sqlite").lower() in {"postgres", "postgresql"}
 SECURE_SSL_REDIRECT = os.getenv("DJANGO_SECURE_SSL_REDIRECT", "false").lower() == "true"

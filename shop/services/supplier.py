@@ -9,6 +9,22 @@ class FulfillmentError(Exception):
     pass
 
 
+def _partner_fulfill_url():
+    base_url = settings.PARTNER_API_BASE_URL.rstrip("/")
+    path = settings.PARTNER_API_FULFILL_PATH.strip() or "/fulfill"
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base_url}{path}"
+
+
+def _partner_headers():
+    auth_header = settings.PARTNER_API_AUTH_HEADER.strip() or "Authorization"
+    auth_scheme = settings.PARTNER_API_AUTH_SCHEME.strip()
+    token = settings.PARTNER_API_KEY
+    auth_value = f"{auth_scheme} {token}".strip() if auth_scheme else token
+    return {auth_header: auth_value}
+
+
 def _mock_partner_tokens(product, quantity, order_no):
     return [
         {
@@ -24,13 +40,13 @@ def request_partner_tokens(product, quantity, order_no):
         return _mock_partner_tokens(product, quantity, order_no)
 
     response = requests.post(
-        f"{settings.PARTNER_API_BASE_URL.rstrip('/')}/fulfill",
+        _partner_fulfill_url(),
         json={
             "order_no": order_no,
             "sku": product.provider_sku,
             "quantity": quantity,
         },
-        headers={"Authorization": f"Bearer {settings.PARTNER_API_KEY}"},
+        headers=_partner_headers(),
         timeout=settings.PARTNER_TIMEOUT,
     )
     response.raise_for_status()

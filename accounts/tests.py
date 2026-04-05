@@ -51,7 +51,15 @@ class AccountAuthFlowTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["delivery_mode"], "local_mail")
         self.assertNotIn("debug_code", payload)
-        self.assertIn("本地邮件输出", payload["message"])
+        self.assertIn("未配置真实邮件发送", payload["message"])
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend", DEBUG=False)
+    def test_send_signup_code_marks_console_backend_as_local_mail_even_when_debug_is_false(self):
+        response = self.client.post(reverse("accounts:signup_send_code"), {"email": "console@example.com"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["delivery_mode"], "local_mail")
+        self.assertIn("不会投递到你的邮箱", payload["message"])
 
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend", DEBUG=True)
     def test_send_signup_code_hides_debug_code_for_real_mail_backend(self):
@@ -65,6 +73,12 @@ class AccountAuthFlowTests(TestCase):
         self.assertEqual(payload["delivery_mode"], "email")
         self.assertNotIn("debug_code", payload)
         self.assertEqual(payload["message"], "验证码已发送，请查收邮箱。")
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")
+    def test_signup_page_warns_when_real_email_delivery_is_disabled(self):
+        response = self.client.get(reverse("accounts:signup"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "当前测试站未配置真实邮件发送")
 
     @override_settings(
         SECURITY_THROTTLE_POLICIES={

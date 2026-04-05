@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b312c">
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'img/gmasterapi-favicon.ico' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/gmasterapi-logo.svg' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/gmasterapi-logo.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -57,7 +60,7 @@
         <header class="site-header site-header--dense">
             <div class="brand-group">
                 <a class="brand-mark" href="{% url 'shop:storefront' %}">
-                    <span class="brand-dot"></span>
+                    <img class="brand-logo" src="{% static 'img/gmasterapi-logo.svg' %}" alt="{{ site_name }} logo">
                     <span>{{ site_name }}</span>
                 </a>
                 <p class="brand-subtitle">为开发者提供 Token 充值、自动发卡与订单查询服务</p>
@@ -100,7 +103,7 @@
             <div class="site-footer__grid">
                 <div class="site-footer__brand">
                     <a class="brand-mark" href="{% url 'shop:storefront' %}">
-                        <span class="brand-dot"></span>
+                        <img class="brand-logo" src="{% static 'img/gmasterapi-logo.svg' %}" alt="{{ site_name }} logo">
                         <span>{{ site_name }}</span>
                     </a>
                     <p class="brand-subtitle">面向虚拟商品、卡密交付和订单查询场景的自动发卡平台。</p>

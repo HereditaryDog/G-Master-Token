@@ -6,7 +6,7 @@ from django.core import signing
 from django.core.mail import send_mail
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -311,6 +311,11 @@ class StartPaymentView(LoginRequiredMixin, View):
 
 class MockPaymentView(LoginRequiredMixin, TemplateView):
     template_name = "shop/mock_pay.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not settings.PAYMENT_ENABLE_MOCK_GATEWAY:
+            raise Http404("mock payment is disabled")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_order(self):
         if not hasattr(self, "_order"):
