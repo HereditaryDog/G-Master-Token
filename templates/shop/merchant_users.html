@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load shop_money %}
+
+{% block title %}用户管理 | {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="merchant-shell">
+    {% include "shop/partials/merchant_sidebar.html" %}
+
+    <div class="merchant-main">
+        <section class="content-card order-desk-hero">
+            <div class="order-desk-hero__copy">
+                <p class="eyebrow">Users</p>
+                <h1>用户管理</h1>
+                <p class="muted">查看当前注册用户、订单数量、累计消费，并进入用户详情核对具体订单记录。</p>
+            </div>
+        </section>
+
+        <section class="stats-grid">
+            <article class="metric-card large">
+                <strong>{{ user_stats.total_count }}</strong>
+                <span>注册用户</span>
+            </article>
+            <article class="metric-card large">
+                <strong>{{ user_stats.verified_count }}</strong>
+                <span>已验证邮箱</span>
+            </article>
+            <article class="metric-card large">
+                <strong>{{ user_stats.buyers_count }}</strong>
+                <span>已有订单用户</span>
+            </article>
+            <article class="metric-card large">
+                <strong>{{ user_stats.paid_revenue|cny }}</strong>
+                <span>累计已支付金额</span>
+            </article>
+        </section>
+
+        <section class="content-card soft order-filter-card">
+            <form method="get" class="filter-toolbar order-filter-toolbar">
+                <label class="field order-filter-toolbar__search">
+                    <span>搜索</span>
+                    {{ filter_form.query }}
+                </label>
+                <div class="filter-toolbar__actions">
+                    <button type="submit" class="primary-button">筛选</button>
+                    <a class="ghost-button" href="{% url 'shop:merchant_users' %}">重置</a>
+                </div>
+            </form>
+        </section>
+
+        <section class="content-card soft">
+            <div class="table-card compact">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>邮箱 / 手机</th>
+                            <th>订单数</th>
+                            <th>已支付订单</th>
+                            <th>累计消费</th>
+                            <th>最近下单</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in customers %}
+                            <tr>
+                                <td>
+                                    <div class="customer-summary">
+                                        <strong>{{ customer.display_name|default:customer.username }}</strong>
+                                        <span class="customer-summary__meta">@{{ customer.username }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="customer-summary">
+                                        <span>{{ customer.email }}</span>
+                                        <span class="customer-summary__meta">{{ customer.phone|default:"-" }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ customer.order_count }}</td>
+                                <td>{{ customer.paid_order_count }}</td>
+                                <td><strong class="customer-money">{{ customer.total_spent|cny }}</strong></td>
+                                <td>{{ customer.last_order_at|date:"Y-m-d H:i"|default:"-" }}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <a class="ghost-button" href="{% url 'shop:merchant_user_detail' customer.pk %}">查看用户</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7">当前没有匹配的注册用户。</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+                <div class="pagination-bar">
+                    <span class="muted">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页，共 {{ page_obj.paginator.count }} 位用户</span>
+                    <div class="pagination-bar__actions">
+                        {% if page_obj.has_previous %}
+                            <a class="ghost-button" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+                        {% endif %}
+                        <span class="pagination-bar__current">第 {{ page_obj.number }} 页</span>
+                        {% if page_obj.has_next %}
+                            <a class="ghost-button" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}

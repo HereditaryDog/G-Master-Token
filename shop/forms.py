@@ -114,6 +114,14 @@ class MerchantProductFilterForm(forms.Form):
         self.fields["query"].widget.attrs.update({"placeholder": "商品名 / slug / SKU"})
 
 
+class MerchantUserFilterForm(forms.Form):
+    query = forms.CharField(label="搜索", required=False, max_length=120)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["query"].widget.attrs.update({"placeholder": "用户名 / 邮箱 / 手机 / 订单号"})
+
+
 class CardCodeBatchForm(forms.Form):
     product = forms.ModelChoiceField(
         queryset=Product.objects.filter(

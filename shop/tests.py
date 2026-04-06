@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from decimal import Decimal
 
 from django.core import mail
 from django.templatetags.static import static
@@ -547,6 +548,38 @@ class MerchantOperationsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.completed_order.order_no)
         self.assertNotContains(response, self.pending_order.order_no)
+
+    def test_merchant_user_list_shows_registered_users_with_order_counts_and_spend(self):
+        idle_user = User.objects.create_user(
+            username="idle-user",
+            password="Buyer123!",
+            email="idle@example.com",
+            display_name="Idle User",
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("shop:merchant_users"))
+        self.assertEqual(response.status_code, 200)
+        customers = list(response.context["customers"])
+        buyer_row = next(customer for customer in customers if customer.pk == self.buyer.pk)
+        idle_row = next(customer for customer in customers if customer.pk == idle_user.pk)
+
+        self.assertEqual(buyer_row.order_count, 3)
+        self.assertEqual(buyer_row.paid_order_count, 2)
+        self.assertEqual(buyer_row.total_spent, Decimal("448"))
+        self.assertEqual(idle_row.order_count, 0)
+        self.assertEqual(idle_row.total_spent, Decimal("0.00"))
+        self.assertFalse(any(customer.pk == self.owner.pk for customer in customers))
+        self.assertContains(response, reverse("shop:merchant_user_detail", args=[self.buyer.pk]))
+
+    def test_merchant_user_detail_shows_customer_orders_and_spend(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("shop:merchant_user_detail", args=[self.buyer.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.completed_order.order_no)
+        self.assertContains(response, self.pending_order.order_no)
+        self.assertContains(response, self.failed_paid_order.order_no)
+        self.assertEqual(response.context["customer"].paid_order_count, 2)
+        self.assertEqual(response.context["customer"].total_spent, Decimal("448"))
 
     def test_merchant_can_mark_order_failed(self):
         self.client.force_login(self.owner)

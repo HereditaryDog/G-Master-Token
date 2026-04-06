@@ -1919,6 +1919,21 @@ select {
     font-weight: 600;
 }
 
+.customer-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}
+
+.customer-summary__meta {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.customer-money {
+    white-space: nowrap;
+}
+
 .merchant-main {
     min-width: 0;
 }

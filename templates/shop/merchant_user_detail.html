@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load shop_money %}
+
+{% block title %}用户详情 | {{ site_name }}{% endblock %}
+
+{% block content %}
+<section class="merchant-shell">
+    {% include "shop/partials/merchant_sidebar.html" %}
+
+    <div class="merchant-main">
+        <section class="section-heading">
+            <div>
+                <p class="eyebrow">User Detail</p>
+                <h1>{{ customer.display_name|default:customer.username }}</h1>
+                <p class="muted">用户名 @{{ customer.username }}，注册时间 {{ customer.date_joined|date:"Y-m-d H:i" }}</p>
+            </div>
+            <a class="ghost-button" href="{% url 'shop:merchant_users' %}">返回用户列表</a>
+        </section>
+
+        <section class="stats-grid">
+            <article class="metric-card large">
+                <strong>{{ customer_stats.order_count }}</strong>
+                <span>订单总数</span>
+            </article>
+            <article class="metric-card large">
+                <strong>{{ customer_stats.paid_order_count }}</strong>
+                <span>已支付订单</span>
+            </article>
+            <article class="metric-card large">
+                <strong>{{ customer_stats.pending_order_count }}</strong>
+                <span>待支付订单</span>
+            </article>
+            <article class="metric-card large">
+                <strong>{{ customer_stats.total_spent|cny }}</strong>
+                <span>累计消费</span>
+            </article>
+        </section>
+
+        <section class="dashboard-grid">
+            <div class="content-card soft">
+                <h3>用户信息</h3>
+                <div class="row-line"><span>用户名</span><strong>{{ customer.username }}</strong></div>
+                <div class="row-line"><span>显示名称</span><strong>{{ customer.display_name|default:"-" }}</strong></div>
+                <div class="row-line"><span>邮箱</span><strong>{{ customer.email|default:"-" }}</strong></div>
+                <div class="row-line"><span>手机号</span><strong>{{ customer.phone|default:"-" }}</strong></div>
+                <div class="row-line"><span>邮箱验证</span><strong>{% if customer.email_verified %}已验证{% else %}未验证{% endif %}</strong></div>
+                <div class="row-line"><span>最近下单</span><strong>{{ customer.last_order_at|date:"Y-m-d H:i"|default:"-" }}</strong></div>
+            </div>
+
+            <div class="content-card soft">
+                <h3>快捷动作</h3>
+                <div class="merchant-mini-list">
+                    <div class="merchant-mini-item">
+                        <div>
+                            <strong>账号中心订单</strong>
+                            <p class="muted">核对这个用户在站内已经创建的全部订单。</p>
+                        </div>
+                        <span class="pill">{{ customer_stats.order_count }} 单</span>
+                    </div>
+                    <div class="merchant-mini-item">
+                        <div>
+                            <strong>累计消费</strong>
+                            <p class="muted">仅统计支付状态为“已支付”的订单金额。</p>
+                        </div>
+                        <strong>{{ customer_stats.total_spent|cny }}</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="content-card soft">
+            <div class="section-heading mini">
+                <div>
+                    <h3>该用户的订单</h3>
+                    <p class="muted">可直接跳到订单详情继续查看支付、发货和重发卡密等动作。</p>
+                </div>
+            </div>
+
+            <div class="table-card compact">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>订单号</th>
+                            <th>状态</th>
+                            <th>支付</th>
+                            <th>金额</th>
+                            <th>时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                            <tr>
+                                <td>{{ order.order_no }}</td>
+                                <td>{{ order.get_status_display }}</td>
+                                <td>{{ order.get_payment_status_display }}</td>
+                                <td>{{ order.total_amount|cny }}</td>
+                                <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <a class="ghost-button" href="{% url 'shop:merchant_order_detail' order.order_no %}">查看订单</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6">这个用户当前还没有订单记录。</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+                <div class="pagination-bar">
+                    <span class="muted">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页，共 {{ page_obj.paginator.count }} 笔订单</span>
+                    <div class="pagination-bar__actions">
+                        {% if page_obj.has_previous %}
+                            <a class="ghost-button" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+                        {% endif %}
+                        <span class="pagination-bar__current">第 {{ page_obj.number }} 页</span>
+                        {% if page_obj.has_next %}
+                            <a class="ghost-button" href="?{% if pagination_query %}{{ pagination_query }}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+</section>
+{% endblock %}

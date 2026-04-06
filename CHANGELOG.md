@@ -2,6 +2,27 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.1.3 - 2026-04-06
+
+### Added
+
+- 商家后台新增“用户管理”入口，可查看当前注册用户、邮箱/手机号、订单数、已支付订单数和累计消费
+- 新增用户详情页，可直接查看单个用户的订单列表、最近下单时间和消费汇总
+- 为商家后台补充用户管理专项测试，覆盖列表统计与详情页订单展示
+
+### Changed
+
+- 仓库发布版本提升为 `1.1.3`
+- README 同步补充用户管理能力说明与当前发布状态
+- 商家后台侧边栏从“商品 / 库存 / 订单”扩展为“用户 / 商品 / 库存 / 订单”统一运营视图
+
+### Verified
+
+- `docker compose --env-file .env.server run --rm web python manage.py test shop.tests.MerchantOperationsTests`
+- `docker compose --env-file .env.server run --rm web python manage.py check`
+- `http://127.0.0.1:8000/health/`
+- `https://gmtoken.shop/health/`
+
 ## 1.1.2 - 2026-04-05
 
 ### Added

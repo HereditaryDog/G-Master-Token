@@ -1,10 +1,11 @@
 <aside class="merchant-sidebar">
     <p class="eyebrow">Back Office</p>
     <h2>商家工作台</h2>
-    <p class="muted">在这里统一管理商品、卡密库存和订单状态。</p>
+    <p class="muted">在这里统一管理用户、商品、卡密库存和订单状态。</p>
 
     <nav class="merchant-menu">
         <a class="{% if merchant_tab == 'dashboard' %}active{% endif %}" href="{% url 'shop:merchant_dashboard' %}">总览</a>
+        <a class="{% if merchant_tab == 'users' %}active{% endif %}" href="{% url 'shop:merchant_users' %}">用户管理</a>
         <a class="{% if merchant_tab == 'products' %}active{% endif %}" href="{% url 'shop:merchant_products' %}">商品管理</a>
         <a class="{% if merchant_tab == 'inventory' %}active{% endif %}" href="{% url 'shop:merchant_inventory' %}">库存卡密</a>
         <a class="{% if merchant_tab == 'orders' %}active{% endif %}" href="{% url 'shop:merchant_orders' %}">订单管理</a>
