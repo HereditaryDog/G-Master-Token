@@ -65,26 +65,30 @@
                 </a>
                 <p class="brand-subtitle">为开发者提供 Token 充值、自动发卡与订单查询服务</p>
             </div>
-            <nav class="site-nav">
-                <a href="{% url 'shop:storefront' %}">首页</a>
-                <a href="{% url 'shop:help_center' %}">帮助中心</a>
-                <a href="{% url 'shop:order_lookup' %}">订单查询</a>
-                <a href="{% url 'shop:support' %}">客服支持</a>
-                {% if request.user.is_authenticated %}
-                    <a href="{% url 'shop:account_center' %}">账号中心</a>
-                    {% if request.user.is_staff or request.user.is_superuser or request.user.is_merchant %}
-                        <a href="{% url 'shop:merchant_dashboard' %}">商家后台</a>
-                        <a href="/admin/">Admin</a>
-                    {% endif %}
-                    <form method="post" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="ghost-button">退出</button>
-                    </form>
-                {% else %}
-                    <a href="{% url 'accounts:login' %}">登录</a>
-                    <a class="cta-link" href="{% url 'accounts:signup' %}">注册</a>
-                {% endif %}
-            </nav>
+            <div class="site-header__nav-shell">
+                <nav class="site-nav" aria-label="站点导航">
+                    <div class="site-nav__group site-nav__group--all">
+                        <a href="{% url 'shop:storefront' %}">首页</a>
+                        <a href="{% url 'shop:help_center' %}">帮助中心</a>
+                        <a href="{% url 'shop:order_lookup' %}">订单查询</a>
+                        <a href="{% url 'shop:support' %}">客服支持</a>
+                        {% if request.user.is_authenticated %}
+                            <a href="{% url 'shop:account_center' %}">账号中心</a>
+                            {% if request.user.is_staff or request.user.is_superuser or request.user.is_merchant %}
+                                <a href="{% url 'shop:merchant_dashboard' %}">商家后台</a>
+                                <a href="/admin/">Admin</a>
+                            {% endif %}
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="ghost-button">退出</button>
+                            </form>
+                        {% else %}
+                            <a href="{% url 'accounts:login' %}">登录</a>
+                            <a class="cta-link" href="{% url 'accounts:signup' %}">注册</a>
+                        {% endif %}
+                    </div>
+                </nav>
+            </div>
         </header>
 
         {% if messages %}

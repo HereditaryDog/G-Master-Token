@@ -10,34 +10,43 @@
     <div class="merchant-main">
         <section class="merchant-console-hero">
             <div class="merchant-console-hero__grid">
-                <div>
+                <div class="merchant-console-hero__content">
                     <p class="eyebrow">Merchant Console</p>
                     <h1>商城管理后台</h1>
                     <p class="muted">把商品、库存、订单和客服状态集中到一张总览桌面里，先看到风险，再处理动作。</p>
-                    <div class="hero-actions">
+                    <div class="merchant-console-hero__spacer" aria-hidden="true"></div>
+                    <div class="hero-actions hero-actions--console">
                         <a class="ghost-button" href="{% url 'shop:merchant_product_create' %}">新增商品</a>
                         <a class="ghost-button" href="{% url 'shop:merchant_inventory' %}">导入卡密</a>
                         <a class="ghost-button" href="/admin/">高级后台</a>
                     </div>
                 </div>
                 <div class="merchant-console-hero__panel">
+                    <div class="merchant-console-hero__panel-head">
+                        <p class="eyebrow">运营快照</p>
+                        <span class="muted">把分类、文章、客服和库存预警集中在同一块，方便快速扫一眼当前状态。</span>
+                    </div>
                     <div class="merchant-kpi-grid">
-                        <article class="merchant-kpi">
+                        <a class="merchant-kpi merchant-kpi--link" href="{% url 'admin:shop_productcategory_changelist' %}">
                             <span>分类</span>
                             <strong>{{ category_count }}</strong>
-                        </article>
-                        <article class="merchant-kpi">
+                            <em>管理分类</em>
+                        </a>
+                        <a class="merchant-kpi merchant-kpi--link" href="{% url 'admin:shop_helparticle_changelist' %}">
                             <span>帮助文章</span>
                             <strong>{{ article_count }}</strong>
-                        </article>
-                        <article class="merchant-kpi">
+                            <em>管理文章</em>
+                        </a>
+                        <a class="merchant-kpi merchant-kpi--link" href="{% url 'shop:merchant_support_tickets' %}?status=pending_support">
                             <span>待客服处理</span>
                             <strong>{{ pending_support_ticket_count }}</strong>
-                        </article>
-                        <article class="merchant-kpi">
+                            <em>查看工单</em>
+                        </a>
+                        <a class="merchant-kpi merchant-kpi--link" href="{% url 'shop:merchant_inventory' %}">
                             <span>库存预警</span>
                             <strong>{{ low_stock_products|length }}</strong>
-                        </article>
+                            <em>去补库存</em>
+                        </a>
                     </div>
                 </div>
             </div>
