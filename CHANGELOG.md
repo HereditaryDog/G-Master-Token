@@ -2,6 +2,32 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.2.4 - 2026-04-08
+
+### Added
+
+- 新增 `shop/emails.py`、`shop/services/audit.py`、`shop/services/order_helpers.py`、`shop/services/support.py`，把邮件通知、敏感操作日志、订单辅助判断和工单消息写入从视图层中抽离
+- 新增 `shop/views/` 包结构，按商家后台职责拆分为 `merchant_dashboard.py`、`merchant_users.py`、`merchant_products.py`、`merchant_inventory.py`、`merchant_orders.py`、`merchant_support.py`
+
+### Changed
+
+- 仓库发布版本提升为 `1.2.4`
+- 原单文件 `shop/views.py` 升级为模块化 package，并保留 `from shop.views import ...` 的兼容导出，避免影响现有 URL 与测试 patch 路径
+- 商家后台用户管理、库存、订单、工单视图已经按模块收口，更适合团队并行协作和后续继续拆分
+- README 同步补充当前视图层组织方式与代码结构说明
+
+### Fixed
+
+- 修复视图层职责混杂导致的单文件膨胀问题，降低商家后台相关改动的冲突概率
+- 修复邮件通知、日志记录、工单消息与视图 HTTP 编排耦合过深的问题
+
+### Verified
+
+- `docker compose --env-file .env.server run --rm web python manage.py check`
+- `docker compose --env-file .env.server run --rm web python manage.py test shop.tests.StoreOrderFlowTests shop.tests.MerchantOperationsTests shop.tests.SupportSystemTests`
+- `http://127.0.0.1:8000/health/`
+- `https://gmtoken.shop/health/`
+
 ## 1.1.4 - 2026-04-07
 
 ### Added

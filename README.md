@@ -1,7 +1,7 @@
 # G-Master-Token
 
 面向数字点卡、Token 充值与自动发货场景的商城系统。  
-当前版本：`1.1.4`
+当前版本：`1.2.4`
 
 快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
@@ -50,6 +50,19 @@ G-Master-Token 是一套基于 Django 的完整商城与交付系统，覆盖：
 - 商品删除采用软删除策略，历史订单保留不受影响
 - 工单系统、订单跟进、发货重试
 - Django Admin 高级后台
+- 商家后台视图已按模块拆分到 `shop/views/merchant_*.py`，便于后续多人协作维护
+
+### 当前代码结构
+
+- `shop/views/public.py`：前台商城、查单、账号中心、支付结果与 webhook
+- `shop/views/merchant_dashboard.py`：商家总览首页
+- `shop/views/merchant_users.py`：用户管理与用户详情
+- `shop/views/merchant_products.py`：商品管理
+- `shop/views/merchant_inventory.py`：库存卡密管理
+- `shop/views/merchant_orders.py`：订单管理
+- `shop/views/merchant_support.py`：客服工单管理
+- `shop/emails.py`：订单提醒与工单通知邮件
+- `shop/services/`：支付、发货、日志、工单、订单辅助逻辑
 
 ### 安全与运维
 
@@ -120,6 +133,11 @@ python manage.py runserver
 - `cloudflared`：可选的 Cloudflare Tunnel connector
 - `web_logs`：持久化 Django 应用日志，默认写入 `/app/runtime_logs/app.log`
 
+当前运行中的网页页脚版本号会读取仓库内版本文件，因此每次发版都需要同步更新：
+
+- `VERSION`
+- `config/version.py`
+
 启动命令：
 
 ```bash
@@ -150,6 +168,11 @@ CLOUDFLARE_TUNNEL_TOKEN=
 - 域名固定
 - 不需要直暴露本机端口
 - 方便 Stripe webhook 与外部联调
+
+## 当前发布状态
+
+- 当前线上测试版本：`1.2.4`
+- 已完成顶部导航优化、商家后台首页优化、用户管理、库存卡密管理增强、审计整改以及视图层模块化拆分
 
 ## 关键环境变量
 
