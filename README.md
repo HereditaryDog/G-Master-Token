@@ -1,7 +1,7 @@
 # G-Master-Token
 
 面向数字点卡、Token 充值与自动发货场景的商城系统。  
-当前版本：`1.2.5`
+当前版本：`1.3.5`
 
 快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
@@ -51,6 +51,7 @@ G-Master-Token 是一套基于 Django 的完整商城与交付系统，覆盖：
 - 工单系统、订单跟进、发货重试
 - Django Admin 高级后台
 - 商家后台视图已按模块拆分到 `shop/views/merchant_*.py`，便于后续多人协作维护
+- 前台界面主题已向 `G-Master API` 主站靠拢，统一为冷白底、蓝紫渐变与玻璃卡片风格
 
 ### 当前代码结构
 
@@ -175,8 +176,8 @@ CLOUDFLARE_TUNNEL_TOKEN=
 
 ## 当前发布状态
 
-- 当前线上测试版本：`1.2.5`
-- 已完成顶部导航优化、商家后台首页优化、用户管理、库存卡密管理增强、审计整改，以及商家后台与前台视图层的模块化拆分
+- 当前线上测试版本：`1.3.5`
+- 已完成顶部导航优化、商家后台首页优化、用户管理、库存卡密管理增强、审计整改、商家后台与前台视图层的模块化拆分，以及前台视觉主题向 `G-Master API` 风格收拢
 
 ## 关键环境变量
 
@@ -334,7 +335,7 @@ docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runti
 
 ## 当前发布状态
 
-`1.2.5` 版本已经完成以下关键链路：
+`1.3.5` 版本已经完成以下关键链路：
 
 - Stripe 测试支付已接通
 - Webhook 回调地址已固定为公网 HTTPS 域名
@@ -350,6 +351,7 @@ docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runti
 - Docker 默认以非 root 运行，并持久化应用日志
 - readiness / preflight 对 `DJANGO_SECRET_KEY`、`CARD_SECRET_KEY`、`DEBUG` 风险提示更明确
 - 视图层已拆分为商家后台模块和前台模块，`public.py` 仅保留兼容导出
+- 前台品牌视觉已向 `G-Master API` 主站对齐，包含蓝紫主题色、玻璃化卡片和更新后的 logo / favicon
 
 ## 路线图
 

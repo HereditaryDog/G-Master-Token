@@ -2,6 +2,31 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.3.5 - 2026-04-09
+
+### Added
+
+- 新增与 `gmapi.fun` 风格对齐的前台蓝紫系主题资源，统一公共页面与商家后台的色板基础
+
+### Changed
+
+- 仓库发布版本提升为 `1.3.5`
+- 首页、导航栏、商品卡片、公告区、页脚和商家后台主面板整体从暖米色方案调整为冷白底 + 蓝紫渐变 + 玻璃卡片风格
+- 顶部与页脚 logo 资源切换为蓝紫系版本，同时浏览器 favicon 增加版本参数，避免缓存长期停留在旧图标
+- README 同步更新当前版本、发布状态与界面风格说明
+
+### Fixed
+
+- 修复站点品牌色与 `G-Master API` 主站风格割裂的问题
+- 修复浏览器标签页 favicon 在资源替换后仍被旧缓存命中的问题
+
+### Verified
+
+- `docker compose --env-file .env.server exec -T web python manage.py check`
+- `docker compose --env-file .env.server up -d --build web`
+- `https://gmtoken.shop/health/`
+- `https://gmtoken.shop/`
+
 ## 1.2.5 - 2026-04-09
 
 ### Added
