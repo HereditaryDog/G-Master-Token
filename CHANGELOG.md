@@ -2,6 +2,31 @@
 
 本文件记录项目的可见版本变更。
 
+## 1.2.5 - 2026-04-09
+
+### Added
+
+- 新增 `shop/views/storefront.py`、`shop/views/orders.py`、`shop/views/support.py`、`shop/views/payments.py`，把前台商城、订单、工单和支付视图继续按职责拆分
+
+### Changed
+
+- 仓库发布版本提升为 `1.2.5`
+- `shop/views/public.py` 现在收缩为兼容导出层，不再承载具体业务实现
+- 前台部分的视图结构升级为“商家后台模块 + 前台模块”双层拆分，后续改动点更集中，冲突面更小
+- README 同步更新代码结构说明和当前发布状态
+
+### Fixed
+
+- 修复 `public.py` 继续承载前台商城、查单、工单、支付多类职责的问题
+- 进一步降低单模块体积，改善前台链路迭代时的可维护性
+
+### Verified
+
+- `docker compose --env-file .env.server run --rm web python manage.py check`
+- `docker compose --env-file .env.server run --rm web python manage.py test shop.tests.StoreOrderFlowTests shop.tests.SupportSystemTests shop.tests.AccountCenterEnhancementTests`
+- `http://127.0.0.1:8000/health/`
+- `https://gmtoken.shop/health/`
+
 ## 1.2.4 - 2026-04-08
 
 ### Added

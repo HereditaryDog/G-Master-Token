@@ -1,7 +1,7 @@
 # G-Master-Token
 
 面向数字点卡、Token 充值与自动发货场景的商城系统。  
-当前版本：`1.2.4`
+当前版本：`1.2.5`
 
 快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
@@ -54,7 +54,11 @@ G-Master-Token 是一套基于 Django 的完整商城与交付系统，覆盖：
 
 ### 当前代码结构
 
-- `shop/views/public.py`：前台商城、查单、账号中心、支付结果与 webhook
+- `shop/views/public.py`：前台兼容导出层
+- `shop/views/storefront.py`：商城首页、商品详情、帮助中心、账号中心、健康检查
+- `shop/views/orders.py`：订单详情、访客查单、发货内容查看、复购
+- `shop/views/support.py`：前台工单创建与回复
+- `shop/views/payments.py`：结账、支付结果、模拟支付、Stripe webhook
 - `shop/views/merchant_dashboard.py`：商家总览首页
 - `shop/views/merchant_users.py`：用户管理与用户详情
 - `shop/views/merchant_products.py`：商品管理
@@ -171,8 +175,8 @@ CLOUDFLARE_TUNNEL_TOKEN=
 
 ## 当前发布状态
 
-- 当前线上测试版本：`1.2.4`
-- 已完成顶部导航优化、商家后台首页优化、用户管理、库存卡密管理增强、审计整改以及视图层模块化拆分
+- 当前线上测试版本：`1.2.5`
+- 已完成顶部导航优化、商家后台首页优化、用户管理、库存卡密管理增强、审计整改，以及商家后台与前台视图层的模块化拆分
 
 ## 关键环境变量
 
@@ -330,7 +334,7 @@ docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runti
 
 ## 当前发布状态
 
-`1.1.4` 版本已经完成以下关键链路：
+`1.2.5` 版本已经完成以下关键链路：
 
 - Stripe 测试支付已接通
 - Webhook 回调地址已固定为公网 HTTPS 域名
@@ -345,6 +349,7 @@ docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runti
 - 商家后台危险跳转参数已收口为站内安全跳转
 - Docker 默认以非 root 运行，并持久化应用日志
 - readiness / preflight 对 `DJANGO_SECRET_KEY`、`CARD_SECRET_KEY`、`DEBUG` 风险提示更明确
+- 视图层已拆分为商家后台模块和前台模块，`public.py` 仅保留兼容导出
 
 ## 路线图
 
