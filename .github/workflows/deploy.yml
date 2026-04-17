@@ -1,0 +1,200 @@
+name: Deploy Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy, for example v1.3.5"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: web_store
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d web_store"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PYTHONUTF8: "1"
+      DJANGO_SECRET_KEY: ci-secret-key
+      CARD_SECRET_KEY: ci-card-secret
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost,testserver
+      SITE_NAME: G-MasterToken
+      SITE_BASE_URL: https://ci.example.com
+      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+      DEFAULT_FROM_EMAIL: no-reply@example.com
+      DATABASE_ENGINE: postgres
+      DATABASE_NAME: web_store
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 5432
+      PAYMENT_ENABLE_MOCK_GATEWAY: "true"
+      PAYMENT_ENABLE_STRIPE_GATEWAY: "true"
+      STRIPE_SECRET_KEY: sk_test_ci
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci
+      STRIPE_WEBHOOK_SECRET: whsec_ci
+      PARTNER_API_BASE_URL: https://partner.example.com/api
+      PARTNER_API_KEY: partner-token
+
+    steps:
+      - name: Resolve target ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ref=refs/tags/${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify release metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          version = Path("VERSION").read_text(encoding="utf-8").strip()
+          config_version = Path("config/version.py").read_text(encoding="utf-8")
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+
+          if f'VERSION = "{version}"' not in config_version:
+              raise SystemExit("config/version.py does not match VERSION")
+
+          if f"## {version} -" not in changelog:
+              raise SystemExit("CHANGELOG.md is missing the current release heading")
+          PY
+
+      - name: Check pending migrations
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Apply migrations
+        run: python manage.py migrate --noinput
+
+      - name: Collect static assets
+        run: python manage.py collectstatic --noinput
+
+      - name: Run Django system check
+        run: python manage.py check
+
+      - name: Run readiness preflight
+        run: python manage.py preflight_check --json
+
+      - name: Run test suite
+        run: python manage.py test accounts shop
+
+      - name: Build Docker image
+        run: docker build -t gmastertoken-release:${{ github.sha }} .
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: verify-release
+    environment:
+      name: production
+
+    steps:
+      - name: Resolve deployment tag
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check deployment secrets
+        id: deploy_config
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PROJECT_PATH: ${{ secrets.DEPLOY_PROJECT_PATH }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          missing=0
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PROJECT_PATH DEPLOY_SSH_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: $name"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 0 ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip deployment when secrets are not configured
+        if: steps.deploy_config.outputs.ready != 'true'
+        run: echo "Deployment skipped. Configure DEPLOY_HOST, DEPLOY_USER, DEPLOY_PROJECT_PATH and DEPLOY_SSH_PRIVATE_KEY to enable GitHub Actions deployment."
+
+      - name: Start SSH agent
+        if: steps.deploy_config.outputs.ready == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Configure known hosts
+        if: steps.deploy_config.outputs.ready == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          if [ -n "$DEPLOY_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${DEPLOY_PORT:-22}" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy tagged release to Windows host
+        if: steps.deploy_config.outputs.ready == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PROJECT_PATH: ${{ secrets.DEPLOY_PROJECT_PATH }}
+          RELEASE_TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "powershell -NoProfile -ExecutionPolicy Bypass -File '${DEPLOY_PROJECT_PATH}/scripts/sync-and-redeploy.ps1' -TargetRef 'refs/tags/${RELEASE_TAG}' -ForceRedeploy"

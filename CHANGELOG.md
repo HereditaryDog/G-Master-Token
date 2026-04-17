@@ -2,6 +2,22 @@
 
 本文件记录项目的可见版本变更。
 
+## Unreleased
+
+### Added
+
+- 新增 GitHub Actions 工作流：`CI`、自动 release tag、按 tag 触发的部署流程
+- 新增 `CONTRIBUTING.md`、`CODEOWNERS` 与 Pull Request 模板，统一分支命名、评审和发版约定
+
+### Changed
+
+- `scripts/sync-and-redeploy.ps1` 现在支持按指定 `TargetRef` 部署，便于 GitHub Actions 直接触发 Windows 目标机即时更新
+- README 与 DEPLOYMENT 文档补充 GitHub 协作流、分支保护要求与自动部署所需 secrets
+
+### Fixed
+
+- `runtime_logs/` 改为默认忽略，避免运行日志目录持续污染 git 工作区
+
 ## 1.3.5 - 2026-04-09
 
 ### Added

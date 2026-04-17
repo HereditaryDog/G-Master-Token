@@ -1,0 +1,82 @@
+name: Release Tag
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+      - config/version.py
+      - CHANGELOG.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  create-release-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve version metadata
+        id: version
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version files are aligned
+        env:
+          VERSION_VALUE: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["VERSION_VALUE"]
+          config_version = Path("config/version.py").read_text(encoding="utf-8")
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+
+          if f'VERSION = "{version}"' not in config_version:
+              raise SystemExit("config/version.py does not match VERSION")
+
+          if f"## {version} -" not in changelog:
+              raise SystemExit("CHANGELOG.md is missing the current release heading")
+          PY
+
+      - name: Skip when tag already exists
+        id: tag_check
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+        run: |
+          git fetch --tags origin
+          if git rev-parse "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create annotated tag
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          VERSION_VALUE: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG_NAME" -m "Release $VERSION_VALUE"
+          git push origin "$TAG_NAME"

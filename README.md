@@ -3,7 +3,7 @@
 面向数字点卡、Token 充值与自动发货场景的商城系统。  
 当前版本：`1.3.5`
 
-快速导航：快速开始 • 核心能力 • 部署方式 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
+快速导航：快速开始 • 核心能力 • 部署方式 • GitHub 流程 • 环境变量 • Stripe 接入 • PostgreSQL 迁移 • 常用命令 • 路线图
 
 ## 项目简介
 
@@ -178,6 +178,14 @@ CLOUDFLARE_TUNNEL_TOKEN=
 
 - 当前线上测试版本：`1.3.5`
 - 已完成顶部导航优化、商家后台首页优化、用户管理、库存卡密管理增强、审计整改、商家后台与前台视图层的模块化拆分，以及前台视觉主题向 `G-Master API` 风格收拢
+
+## GitHub 流程
+
+- `main` 现在作为受保护发布分支使用，日常开发走 `feat/*`、`fix/*`、`chore/*`、`release/*` 分支
+- Pull Request 合并前需要通过 GitHub Actions job `django-test-and-build`
+- 当 `VERSION`、`config/version.py`、`CHANGELOG.md` 形成一次正式发版提交并进入 `main` 后，GitHub Actions 会自动创建 `v<version>` tag
+- `v<version>` tag 会触发部署工作流；目标机仍然使用仓库内的 `scripts/sync-and-redeploy.ps1` 执行拉取和重启
+- 具体仓库协作与分支保护要求见 [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## 关键环境变量
 

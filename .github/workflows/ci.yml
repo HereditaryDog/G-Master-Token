@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  django-test-and-build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: web_store
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d web_store"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PYTHONUTF8: "1"
+      DJANGO_SECRET_KEY: ci-secret-key
+      CARD_SECRET_KEY: ci-card-secret
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost,testserver
+      SITE_NAME: G-MasterToken
+      SITE_BASE_URL: https://ci.example.com
+      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+      DEFAULT_FROM_EMAIL: no-reply@example.com
+      DATABASE_ENGINE: postgres
+      DATABASE_NAME: web_store
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 5432
+      PAYMENT_ENABLE_MOCK_GATEWAY: "true"
+      PAYMENT_ENABLE_STRIPE_GATEWAY: "true"
+      STRIPE_SECRET_KEY: sk_test_ci
+      STRIPE_PUBLISHABLE_KEY: pk_test_ci
+      STRIPE_WEBHOOK_SECRET: whsec_ci
+      PARTNER_API_BASE_URL: https://partner.example.com/api
+      PARTNER_API_KEY: partner-token
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify release metadata stays aligned
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          version = Path("VERSION").read_text(encoding="utf-8").strip()
+          config_version = Path("config/version.py").read_text(encoding="utf-8")
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+
+          if f'VERSION = "{version}"' not in config_version:
+              raise SystemExit("config/version.py does not match VERSION")
+
+          if f"## {version} -" not in changelog:
+              raise SystemExit("CHANGELOG.md is missing the current release heading")
+          PY
+
+      - name: Check pending migrations
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Apply migrations
+        run: python manage.py migrate --noinput
+
+      - name: Collect static assets
+        run: python manage.py collectstatic --noinput
+
+      - name: Run Django system check
+        run: python manage.py check
+
+      - name: Run readiness preflight
+        run: python manage.py preflight_check --json
+
+      - name: Run test suite
+        run: python manage.py test accounts shop
+
+      - name: Build Docker image
+        run: docker build -t gmastertoken-ci:${{ github.sha }} .

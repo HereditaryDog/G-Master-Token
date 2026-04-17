@@ -12,3 +12,6 @@ logs/
 .venv-service/
 .codex-backups/
 output/playwright/
+runtime_logs/
+.coverage
+htmlcov/

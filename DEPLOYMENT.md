@@ -30,6 +30,39 @@ docker compose --env-file .env.server exec -T web sh -lc 'tail -n 100 /app/runti
 docker compose --env-file .env.server exec -T web id -u
 ```
 
+## GitHub Actions 自动部署
+
+仓库现已约定为：
+
+- Pull Request / `main` push 走 `.github/workflows/ci.yml`
+- `main` 上的正式版本提交会由 `.github/workflows/release-tag.yml` 自动打出 `v<version>` tag
+- `v<version>` tag 会触发 `.github/workflows/deploy.yml`
+
+部署工作流会通过 SSH 连接到 Windows 部署机，并执行：
+
+```powershell
+.\scripts\sync-and-redeploy.ps1 -TargetRef refs/tags/vX.Y.Z -ForceRedeploy
+```
+
+这样部署机会把本地 `main` 快进到对应 release tag 所在提交，再按现有逻辑重建 Docker 或重启本地服务。
+
+### GitHub Secrets
+
+要启用 GitHub Actions 自动部署，先在仓库里配置这些 secrets：
+
+- `DEPLOY_HOST`
+- `DEPLOY_PORT`
+- `DEPLOY_USER`
+- `DEPLOY_PROJECT_PATH`
+- `DEPLOY_SSH_PRIVATE_KEY`
+- `DEPLOY_KNOWN_HOSTS`
+
+说明：
+
+- `DEPLOY_PROJECT_PATH` 建议填写 PowerShell 可直接识别的绝对路径，例如 `C:/Users/Administrator/Desktop/web_test`
+- `DEPLOY_KNOWN_HOSTS` 推荐保存目标机 SSH 主机指纹；如果不填，workflow 会在运行时执行 `ssh-keyscan`
+- 目标 Windows 主机需要先启用 OpenSSH Server，且该用户对仓库目录有读写权限
+
 ## 库存页分页
 
 库存卡密管理页现在支持标准分页：
